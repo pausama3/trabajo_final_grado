@@ -1,4 +1,4 @@
-package com.medmanager.ServidorMedManager;
+package com.medmanager.ServidorMedManager.modelo;
 
 import jakarta.persistence.*;
 

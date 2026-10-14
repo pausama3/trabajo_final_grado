@@ -15,11 +15,11 @@
         <property name="hibernate.format_sql">true</property>
         <property name="hibernate.hbm2ddl.auto">update</property>
         
-        <!-- 3. Enlazamos las 5 clases Entidad con Hibernate (DENTRO de session-factory) -->
-        <mapping class="com.medmanager.ServidorMedManager.Especialidad"/>
-        <mapping class="com.medmanager.ServidorMedManager.Paciente"/>
-        <mapping class="com.medmanager.ServidorMedManager.Trabajador"/>
-        <mapping class="com.medmanager.ServidorMedManager.Cita"/>
-        <mapping class="com.medmanager.ServidorMedManager.Historial_Medico"/>
+<!-- 3. Enlazamos las 5 clases Entidad con su nueva ruta .modelo -->
+     <mapping class="com.medmanager.ServidorMedManager.modelo.Especialidad"/>
+     <mapping class="com.medmanager.ServidorMedManager.modelo.Paciente"/>
+     <mapping class="com.medmanager.ServidorMedManager.modelo.Trabajador"/>
+     <mapping class="com.medmanager.ServidorMedManager.modelo.Cita"/>
+     <mapping class="com.medmanager.ServidorMedManager.modelo.Historial_Medico"/>
     </session-factory> 
 </hibernate-configuration>

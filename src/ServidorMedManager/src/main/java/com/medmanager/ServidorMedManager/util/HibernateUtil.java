@@ -1,4 +1,4 @@
-package com.medmanager.ServidorMedManager;
+package com.medmanager.ServidorMedManager.util;
 
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
