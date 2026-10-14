@@ -37,8 +37,7 @@ public class Cita {
 	// Constructores
 	public Cita() {	
 	}
-	
-	// Fíjate que ahora el constructor pide objetos Paciente y Trabajador, no números int
+
 	public Cita(Paciente paciente, Trabajador trabajador, LocalDateTime fecha_hora, String estado, String motivo_consulta, String diagnostico) {
 		this.paciente = paciente;
 		this.trabajador = trabajador;
@@ -57,7 +56,7 @@ public class Cita {
 	public String getMotivo_consulta() { return motivo_consulta; }
 	public String getDiagnostico() { return diagnostico; }
 
-	// Setters (sin el setId_cita)
+	// Setters 
 	public void setPaciente(Paciente paciente) { this.paciente = paciente; }
 	public void setTrabajador(Trabajador trabajador) { this.trabajador = trabajador; }
 	public void setFecha_hora(LocalDateTime fecha_hora) { this.fecha_hora = fecha_hora; }
