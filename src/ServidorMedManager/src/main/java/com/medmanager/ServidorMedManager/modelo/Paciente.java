@@ -9,8 +9,8 @@ public class Paciente {
 
 	@Id // PK
 	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name= "id_paciente")
-	private int id_paciente;
+	@Column(name= "id")
+	private int id;
 	
 	@Column(name = "dni", nullable = false, length = 9)
 	private String dni;
@@ -33,6 +33,9 @@ public class Paciente {
 	@Column(name = "fecha_nacimiento", nullable = true)
 	private LocalDate fecha_nacimiento; // Usamos LocalDate
 	
+	@Column(name = "alergias", nullable = true, length = 50)
+	private String alergias;
+	
 	@Column(name = "activo", nullable = false, columnDefinition = "boolean default true")
 	private boolean activo = true; 
 	
@@ -40,7 +43,7 @@ public class Paciente {
 	public Paciente() {	
 	}
 	
-	public Paciente(String dni, LocalDate fecha_nacimiento, String nombre, String apellidos, String telefono, String email, String direccion, boolean activo) {
+	public Paciente(String dni, LocalDate fecha_nacimiento, String nombre, String apellidos, String telefono, String email, String direccion, String alergias, boolean activo) {
 		this.dni = dni;
 		this.fecha_nacimiento = fecha_nacimiento;
 		this.nombre = nombre;
@@ -48,11 +51,12 @@ public class Paciente {
 		this.telefono = telefono;
 		this.email = email;
 		this.direccion = direccion;
+		this.alergias = alergias;
 		this.activo = activo;
 	}
 
 	// Getters
-	public int getId_paciente() { return id_paciente; }
+	public int getId_paciente() { return id; }
 	public String getDni() { return dni; }
 	public LocalDate getFecha_nacimiento() { return fecha_nacimiento; }
 	public String getNombre() { return nombre; }
@@ -60,6 +64,7 @@ public class Paciente {
 	public String getTelefono() { return telefono; }
 	public String getEmail() { return email; }
 	public String getDireccion() { return direccion; }
+	public String getAlergias() { return alergias; }
 	public boolean isActivo() { return activo; } 
 
 	// Setters
@@ -70,5 +75,6 @@ public class Paciente {
 	public void setTelefono(String telefono) { this.telefono = telefono; }
 	public void setEmail(String email) { this.email = email; }
 	public void setDireccion(String direccion) { this.direccion = direccion; }
+	public void setAlergias (String alergias) { this.alergias = alergias; }
 	public void setActivo(boolean activo) { this.activo = activo; }
 }

@@ -9,8 +9,8 @@ public class Especialidad {
 	
 	@Id // PK
 	@GeneratedValue(strategy = GenerationType.IDENTITY)//auto_increment
-	@Column(name = "id_especialidad")
-	private int id_especialidad;
+	@Column(name = "id")
+	private int id;
 	
 	@Column(name = "nombre_especialidad", nullable = false, length = 50 )
 	private String nombre_especialidad;
@@ -27,23 +27,20 @@ public class Especialidad {
 		this.descripcion = descripcion;
 	}
 	// getters
-	public int getId_especialidad() {
-		return id_especialidad;
+	public int getId() {
+		return id;
 	}
-	public String getnombre_especialidad() {
+	public String getNombre_especialidad() {
 		return nombre_especialidad;
 	}
-	public String getdescripcion() {
+	public String getDescripcion() {
 		return descripcion;
 	}
 	// Setters
-	/*public void setId_especialidad(int id_especialidad) {
-		this.id_especialidad = id_especialidad;
-	}*/
-	public void setnombre_especialidad(String nombre_especialidad) {
+	public void setNombre_especialidad(String nombre_especialidad) {
 		this.nombre_especialidad = nombre_especialidad;
 	}
-	public void setdescripcion(String descripcion) { 
+	public void setDescripcion(String descripcion) { 
 		this.descripcion = descripcion;
 	}
 }

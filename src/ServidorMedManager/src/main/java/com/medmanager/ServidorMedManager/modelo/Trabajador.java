@@ -12,8 +12,8 @@ public class Trabajador {
 	
 	@Id // PK
 	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name = "id_trabajador")
-	private int id_trabajador;
+	@Column(name = "id")
+	private int id;
 	
 	@Column(name = "dni", nullable = false, unique = true, length = 9)
 	private String dni;
@@ -38,14 +38,13 @@ public class Trabajador {
 	private String password_hash; 
 
 	@ManyToOne
-	@JoinColumn(name = "id_especialidad", nullable = true)
+	@JoinColumn(name = "especialidad", nullable = true)
 	private Especialidad especialidad;
 	
 	// Constructores
 	public Trabajador() {	
 	}
 	
-	// Aquí cambiamos String rol por Rol rol
 	public Trabajador(String dni, String nombre, String apellidos, String telefono, Rol rol, String usuario, String password_hash, Especialidad especialidad)  {
 		this.dni = dni;
 		this.nombre = nombre;
@@ -58,7 +57,7 @@ public class Trabajador {
 	}
 
 	// Getters
-	public int getId_trabajador() { return id_trabajador; }
+	public int getId_trabajador() { return id; }
 	public String getDni() { return dni; }
 	public String getNombre() { return nombre; }
 	public String getApellidos() { return apellidos; }

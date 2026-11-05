@@ -9,17 +9,17 @@ public class Historial_Medico {
 
 	@Id // PK (PRI)
 	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name = "id_historial")
+	@Column(name = "id")
 	private int id_historial;
 
 	// Key: MUL | Null: NO
 	@ManyToOne
-	@JoinColumn(name = "id_paciente", nullable = false)
+	@JoinColumn(name = "paciente", nullable = false)
 	private Paciente paciente;
 
 	// Key: MUL | Null: NO (Cambiado a @ManyToOne para coincidir con el MUL de tu tabla)
 	@ManyToOne
-	@JoinColumn(name = "id_cita", nullable = false)
+	@JoinColumn(name = "cita", nullable = false)
 	private Cita cita;
 
 	// Type: text | Null: NO
@@ -62,7 +62,7 @@ public class Historial_Medico {
 	public String getTratamiento() { return tratamiento; }
 	public LocalDateTime getFecha_registro() { return fecha_registro; }
 
-	// Setters (sin setId_historial porque es auto_increment)
+	// Setters 
 	public void setPaciente(Paciente paciente) { this.paciente = paciente; }
 	public void setCita(Cita cita) { this.cita = cita; }
 	public void setDiagnostico(String diagnostico) { this.diagnostico = diagnostico; }

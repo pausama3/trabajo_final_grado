@@ -9,16 +9,16 @@ public class Cita {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "id_cita")
-	private int id_cita;
+	@Column(name = "id")
+	private int id;
 	
 	// --- CLAVES FORÁNEAS COMO OBJETOS ---
 	@ManyToOne
-	@JoinColumn(name = "id_paciente", nullable = false)
+	@JoinColumn(name = "paciente", nullable = false)
 	private Paciente paciente;
 	
 	@ManyToOne
-	@JoinColumn(name = "id_trabajador", nullable = false)
+	@JoinColumn(name = "trabajador", nullable = false)
 	private Trabajador trabajador;
 	// ------------------------------------
 	
@@ -30,30 +30,26 @@ public class Cita {
 	
 	@Column(name = "motivo_consulta", nullable = true, length = 255)
 	private String motivo_consulta;
-	
-	@Column(name = "diagnostico", nullable = true)
-	private String diagnostico;
-	
-	@Column(name = "observaciones", nullable = true, columnDefinition = "TEXT")
-	private String observaciones;
+
+	@Column(name = "observaciones_enfermeria", nullable = true, columnDefinition = "TEXT")
+	private String observaciones_enfermeria;
 	
 	// Constructores
 	public Cita() {	
 	}
 
-	public Cita(Paciente paciente, Trabajador trabajador, LocalDateTime fecha_hora, String estado, String motivo_consulta, String diagnostico, String observaciones) {
+	public Cita(Paciente paciente, Trabajador trabajador, LocalDateTime fecha_hora, String estado, String motivo_consulta, String diagnostico, String observaciones_enfermeria) {
 		this.paciente = paciente;
 		this.trabajador = trabajador;
 		this.fecha_hora = fecha_hora;
 		this.estado = estado;
 		this.motivo_consulta = motivo_consulta;
-		this.diagnostico = diagnostico;
-		this.observaciones = observaciones;
+		this.observaciones_enfermeria = observaciones_enfermeria;
 	}
 
 	// Getters
 	public int getId_cita() {
-		return id_cita;
+		return id;
 	}
 
 	public Paciente getPaciente() {
@@ -77,11 +73,7 @@ public class Cita {
 	}
 
 	public String getObservaciones() {
-		return observaciones;
-	}
-
-	public String getDiagnostico() {
-		return diagnostico;
+		return observaciones_enfermeria;
 	}
 
 	// Setters
@@ -105,11 +97,8 @@ public class Cita {
 		this.motivo_consulta = motivo_consulta;
 	}
 
-	public void setObservaciones(String observaciones) {
-		this.observaciones = observaciones;
+	public void setobservaciones_enfermeria(String observaciones_enfermeria) {
+		this.observaciones_enfermeria = observaciones_enfermeria;
 	}
 
-	public void setDiagnostico(String diagnostico) {
-		this.diagnostico = diagnostico;
-	}
 }
