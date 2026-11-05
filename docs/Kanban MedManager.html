@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kanban MedManager</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f5f1;--surf:#fff;--col:#ecebe5;--tx:#1f1f1c;--mut:#6b6a63;--bd:#d9d7cd;--ac:#1d6fb8;
+--servidor:#1d6fb8;--bd-t:#b8731d;--escritorio:#2f8f5b;--android:#8a4fc4;--memoria:#c4476b;--urg:#d03b3b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--surf:#232321;--col:#1d1d1b;--tx:#ecebe5;--mut:#9a998f;--bd:#3a3a36;--ac:#5aa6e8;
+--servidor:#5aa6e8;--bd-t:#e0a050;--escritorio:#5cc48a;--android:#b58be8;--memoria:#e87a9a;--urg:#ef6a6a}}
+:root[data-theme="dark"]{--bg:#171716;--surf:#232321;--col:#1d1d1b;--tx:#ecebe5;--mut:#9a998f;--bd:#3a3a36;--ac:#5aa6e8;
+--servidor:#5aa6e8;--bd-t:#e0a050;--escritorio:#5cc48a;--android:#b58be8;--memoria:#e87a9a;--urg:#ef6a6a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+h1{font-size:20px;margin:0 0 2px}
+.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
+.bar{height:8px;background:var(--col);border-radius:4px;overflow:hidden;margin:6px 0 14px;border:1px solid var(--bd)}
+.bar i{display:block;height:100%;background:var(--escritorio);width:0;transition:width .3s}
+.add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.add input,.add select,.add button,.filters button{font:inherit;padding:7px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx)}
+.add input[type=text]{flex:1 1 220px}
+.add button{background:var(--ac);color:#fff;border-color:var(--ac);cursor:pointer}
+.search{display:block;width:100%;font:inherit;padding:8px 12px;margin-bottom:10px;border:1px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx)}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.filters button{cursor:pointer;font-size:13px;padding:4px 10px}
+.filters button.on{background:var(--tx);color:var(--bg)}
+.board{display:grid;grid-template-columns:repeat(3,minmax(250px,1fr));gap:12px;overflow-x:auto}
+.col{background:var(--col);border:1px solid var(--bd);border-radius:12px;padding:10px;min-height:200px}
+.col.over{outline:2px dashed var(--ac)}
+.col h2{font-size:14px;margin:0 0 8px;display:flex;justify-content:space-between}
+.col h2 span{color:var(--mut);font-weight:400}
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:9px 10px;margin-bottom:8px;cursor:grab}
+.card.drag{opacity:.4}
+.t{outline:none;font-size:14px;word-break:break-word}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:7px;font-size:12px;color:var(--mut)}
+.tag{padding:1px 8px;border-radius:10px;color:#fff;font-size:11px}
+.late{color:var(--urg);font-weight:600}
+.act{margin-left:auto;display:flex;gap:2px}
+.act button{border:0;background:none;color:var(--mut);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:6px}
+.act button:hover{background:var(--col);color:var(--tx)}
+.hot{border-left:4px solid var(--urg)}
+.foot{margin-top:14px;font-size:12px;color:var(--mut)}
+.foot button{font:inherit;font-size:12px;border:1px solid var(--bd);background:var(--surf);color:var(--tx);border-radius:6px;padding:3px 8px;cursor:pointer}
+@media (max-width:700px){.board{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>MedManager · Kanban</h1>
+<div class="sub" id="sub"></div>
+<div class="bar"><i id="bar"></i></div>
+
+<div class="add">
+  <input type="text" id="nt" placeholder="Nueva tarea…">
+  <select id="ng"></select>
+  <input type="date" id="nd">
+  <label style="display:flex;align-items:center;gap:4px;font-size:13px"><input type="checkbox" id="np"> Urgente</label>
+  <button id="nb">Añadir</button>
+</div>
+<input type="search" class="search" id="q" placeholder="🔍 Buscar tareas (título o etiqueta)…" autocomplete="off">
+<div class="filters" id="filters"></div>
+<div class="board" id="board"></div>
+<div class="foot">Arrastra las tarjetas o usa ◀ ▶. Haz clic en el título para editarlo. Los cambios se guardan en este navegador. <button id="rs">Restaurar tareas iniciales</button></div>
+
+<script>
+const TAGS={servidor:'Servidor',bd:'Base de datos',escritorio:'Escritorio',android:'Android',memoria:'Memoria'};
+const COLS=[['todo','Pendiente'],['doing','En curso'],['done','Hecho']];
+const KEY='medmanager-kanban-v1';
+let n=0;const T=(title,col,tag,due,hot)=>({id:++n,title,col,tag,due:due||'',hot:!!hot});
+function seed(){n=0;return[
+T('Proyecto Maven + estructura de paquetes','done','servidor'),
+T('HibernateUtil (SessionFactory única)','done','servidor'),
+T('ServerSocket con un hilo por cliente','done','servidor'),
+T('Entidades: Paciente, Trabajador, Cita, Especialidad, Historial_Medico','done','servidor'),
+T('Tablas creadas en MySQL (5 tablas)','done','bd'),
+T('Alinear columnas entidades ↔ MySQL (id vs id_paciente, paciente vs id_paciente, especialidad vs id_especialidad…)','doing','bd','2026-11-06',true),
+T('Cita: BD tiene «diagnostico» y «observaciones»; entidad usa «observaciones_enfermeria». Unificar','todo','bd','2026-11-06',true),
+T('Paciente: añadir columna «alergias» en MySQL (falta) y ampliar «direccion» a 255 en la entidad','todo','bd','2026-11-06',true),
+T('pom.xml: JRE está en 1.8 y Hibernate 6 (jakarta.persistence) exige Java 11/17','todo','servidor','2026-11-06',true),
+T('Rol: unificar enum (Recepcionista/Enfermero/Médico) con lo que usa la memoria (MEDICO…)','todo','bd','2026-11-09'),
+T('Script DDL: CHECK de 15 min, fecha_hora_activa + UNIQUE, CHECK especialidad','todo','bd','2026-11-09'),
+T('Triggers: Cita→trabajador MEDICO; Historial→paciente coherente','todo','bd','2026-11-10'),
+T('Usuario MySQL de mínimo privilegio + datos de prueba','todo','bd','2026-11-10'),
+T('PaqueteRed (Serializable): accion + payload','todo','servidor','2026-11-09'),
+T('Pasar ManejadorCliente a ObjectInput/OutputStream y bucle de peticiones','todo','servidor','2026-11-10'),
+T('Interfaz IDAO<T> + PacienteDAO, TrabajadorDAO, CitaDAO, EspecialidadDAO, HistorialMedicoDAO','todo','servidor','2026-11-12'),
+T('Login con BCrypt + rol de sesión en el hilo','todo','servidor','2026-11-12'),
+T('Filtrado por rol (RN3/RN4): admin sin datos clínicos, enfermero solo observaciones','todo','servidor','2026-11-13'),
+T('Pruebas JUnit del servidor','todo','servidor','2026-11-13'),
+T('Swing: ClienteSocket (Singleton) + LoginFrame','todo','escritorio','2026-11-16'),
+T('Swing: DashboardFrame con menú lateral','todo','escritorio','2026-11-18'),
+T('Swing: CRUD pacientes (baja lógica) + agenda de citas','todo','escritorio','2026-11-21'),
+T('Swing: historial clínico para médico (diagnóstico, tratamiento, alergias)','todo','escritorio','2026-11-24'),
+T('Android: proyecto Kotlin + layouts XML + login','todo','android','2026-11-27'),
+T('Android: búsqueda por DNI/nombre + ficha rápida','todo','android','2026-12-01'),
+T('Android: añadir observaciones a la cita (corrutinas + sockets)','todo','android','2026-12-03'),
+T('Pruebas de integración (3 clientes simultáneos)','todo','android','2026-12-04'),
+T('Memoria: completar 3 Metodología, 5.4 Desviaciones, 8 Pruebas, 9 Conclusiones, 11 Bibliografía, Abstract (en pausa hasta tener las apps)','todo','memoria','2026-12-08'),
+T('Manuales de instalación y de usuario (anexos)','todo','memoria','2026-12-09'),
+T('Vídeo de defensa (50 % de la nota)','todo','memoria','2026-12-10'),
+T('Entrega final en el campus (cierra 11/12 a las 09:59)','todo','memoria','2026-12-11',true)
+]}
+let tasks,filter='all',query='';
+const norm=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+try{const s=localStorage.getItem(KEY);tasks=s?JSON.parse(s):null}catch(e){tasks=null}
+if(!tasks||!Array.isArray(tasks)){tasks=seed()}
+n=tasks.reduce((m,t)=>Math.max(m,t.id),0);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(tasks))}catch(e){}};
+const $=id=>document.getElementById(id);
+const tagSel=$('ng');for(const k in TAGS){tagSel.add(new Option(TAGS[k],k))}
+function renderFilters(){const f=$('filters');f.innerHTML='';
+ [['all','Todas'],...Object.entries(TAGS)].forEach(([k,v])=>{const b=document.createElement('button');b.textContent=v;if(filter===k)b.className='on';b.onclick=()=>{filter=k;render()};f.appendChild(b)})}
+function fmt(d){if(!d)return '';const [y,m,dd]=d.split('-');return dd+'/'+m}
+function render(){
+ renderFilters();
+ const done=tasks.filter(t=>t.col==='done').length;
+ $('bar').style.width=(tasks.length?done/tasks.length*100:0)+'%';
+ const days=Math.ceil((new Date('2026-12-11T09:59')-new Date())/864e5);
+ $('sub').textContent=done+' de '+tasks.length+' tareas hechas · entrega final en '+days+' días (11/12/2026)';
+ const board=$('board');board.innerHTML='';
+ const today=new Date().toISOString().slice(0,10);
+ COLS.forEach(([cid,cname],ci)=>{
+  const col=document.createElement('div');col.className='col';
+  const words=norm(query).split(/\s+/).filter(Boolean);
+  const list=tasks.filter(t=>t.col===cid&&(filter==='all'||t.tag===filter)&&words.every(w=>norm(t.title+' '+(TAGS[t.tag]||t.tag)).includes(w)));
+  col.innerHTML='<h2>'+cname+'<span>'+list.length+'</span></h2>';
+  col.ondragover=e=>{e.preventDefault();col.classList.add('over')};
+  col.ondragleave=()=>col.classList.remove('over');
+  col.ondrop=e=>{e.preventDefault();col.classList.remove('over');const id=+e.dataTransfer.getData('text');const t=tasks.find(x=>x.id===id);if(t){t.col=cid;save();render()}};
+  list.forEach(t=>{
+   const c=document.createElement('div');c.className='card'+(t.hot&&t.col!=='done'?' hot':'');c.draggable=true;
+   c.ondragstart=e=>{e.dataTransfer.setData('text',t.id);c.classList.add('drag')};
+   c.ondragend=()=>c.classList.remove('drag');
+   const ti=document.createElement('div');ti.className='t';ti.contentEditable='true';ti.textContent=t.title;
+   ti.onblur=()=>{const v=ti.textContent.trim();if(v&&v!==t.title){t.title=v;save()}else ti.textContent=t.title};
+   ti.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ti.blur()}};
+   const m=document.createElement('div');m.className='meta';
+   const tg=document.createElement('span');tg.className='tag';tg.style.background='var(--'+(t.tag==='bd'?'bd-t':t.tag)+')';tg.textContent=TAGS[t.tag]||t.tag;m.appendChild(tg);
+   if(t.due){const d=document.createElement('span');const late=t.col!=='done'&&t.due<today;d.textContent='📅 '+fmt(t.due);if(late){d.className='late';d.textContent+=' · vencida'}m.appendChild(d)}
+   const a=document.createElement('div');a.className='act';
+   const mk=(txt,fn,ttl)=>{const b=document.createElement('button');b.textContent=txt;b.title=ttl;b.onclick=fn;a.appendChild(b)};
+   if(ci>0)mk('◀',()=>{t.col=COLS[ci-1][0];save();render()},'Mover atrás');
+   if(ci<2)mk('▶',()=>{t.col=COLS[ci+1][0];save();render()},'Mover adelante');
+   mk('✕',()=>{tasks=tasks.filter(x=>x.id!==t.id);save();render()},'Borrar');
+   m.appendChild(a);c.append(ti,m);col.appendChild(c)});
+  board.appendChild(col)})}
+function add(){const v=$('nt').value.trim();if(!v)return;
+ tasks.push({id:++n,title:v,col:'todo',tag:$('ng').value,due:$('nd').value,hot:$('np').checked});
+ $('nt').value='';$('nd').value='';$('np').checked=false;save();render()}
+$('nb').onclick=add;$('nt').onkeydown=e=>{if(e.key==='Enter')add()};
+$('q').oninput=e=>{query=e.target.value;render()};
+$('q').onkeydown=e=>{if(e.key==='Escape'){e.target.value='';query='';render()}};
+$('rs').onclick=()=>{tasks=seed();save();render()};
+render();
+</script>
+</body>
+</html>

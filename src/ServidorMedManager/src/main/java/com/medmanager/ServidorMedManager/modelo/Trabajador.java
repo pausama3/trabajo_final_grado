@@ -7,12 +7,12 @@ import jakarta.persistence.*;
 public class Trabajador {
 	
 	public enum Rol {
-	    Recepcionista, Enfermero, Médico
+	    RECEPCIONISTA, ENFERMERO, MEDICO
 	}
 	
 	@Id // PK
 	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name = "id")
+	@Column(name = "id_trabajador")
 	private int id;
 	
 	@Column(name = "dni", nullable = false, unique = true, length = 9)
@@ -28,7 +28,7 @@ public class Trabajador {
 	private String telefono;
 	
 	@Enumerated(EnumType.STRING)
-	@Column(name = "rol", nullable = false, columnDefinition = "ENUM('Recepcionista', 'Enfermero', 'Médico')")
+	@Column(name = "rol", nullable = false)
 	private Rol rol;
 	
 	@Column(name = "usuario", nullable = false, unique = true, length = 50)
@@ -38,7 +38,7 @@ public class Trabajador {
 	private String password_hash; 
 
 	@ManyToOne
-	@JoinColumn(name = "especialidad", nullable = true)
+	@JoinColumn(name = "id_especialidad", nullable = true)
 	private Especialidad especialidad;
 	
 	// Constructores

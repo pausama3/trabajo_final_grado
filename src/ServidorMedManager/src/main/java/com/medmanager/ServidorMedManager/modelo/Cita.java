@@ -9,16 +9,16 @@ public class Cita {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "id")
+	@Column(name = "id_cita")
 	private int id;
 	
 	// --- CLAVES FORÁNEAS COMO OBJETOS ---
 	@ManyToOne
-	@JoinColumn(name = "paciente", nullable = false)
+	@JoinColumn(name = "id_paciente", nullable = false)
 	private Paciente paciente;
 	
 	@ManyToOne
-	@JoinColumn(name = "trabajador", nullable = false)
+	@JoinColumn(name = "id_trabajador", nullable = false)
 	private Trabajador trabajador;
 	// ------------------------------------
 	
@@ -38,7 +38,7 @@ public class Cita {
 	public Cita() {	
 	}
 
-	public Cita(Paciente paciente, Trabajador trabajador, LocalDateTime fecha_hora, String estado, String motivo_consulta, String diagnostico, String observaciones_enfermeria) {
+	public Cita(Paciente paciente, Trabajador trabajador, LocalDateTime fecha_hora, String estado, String motivo_consulta, String observaciones_enfermeria) {
 		this.paciente = paciente;
 		this.trabajador = trabajador;
 		this.fecha_hora = fecha_hora;
@@ -97,7 +97,7 @@ public class Cita {
 		this.motivo_consulta = motivo_consulta;
 	}
 
-	public void setobservaciones_enfermeria(String observaciones_enfermeria) {
+	public void setObservaciones_enfermeria(String observaciones_enfermeria) {
 		this.observaciones_enfermeria = observaciones_enfermeria;
 	}
 

@@ -9,17 +9,15 @@ public class Historial_Medico {
 
 	@Id // PK (PRI)
 	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name = "id")
+	@Column(name = "id_historial")
 	private int id_historial;
 
-	// Key: MUL | Null: NO
 	@ManyToOne
-	@JoinColumn(name = "paciente", nullable = false)
+	@JoinColumn(name = "id_paciente", nullable = false)
 	private Paciente paciente;
 
-	// Key: MUL | Null: NO (Cambiado a @ManyToOne para coincidir con el MUL de tu tabla)
-	@ManyToOne
-	@JoinColumn(name = "cita", nullable = false)
+	@OneToOne
+	@JoinColumn(name = "id_cita", nullable = false, unique = true)
 	private Cita cita;
 
 	// Type: text | Null: NO

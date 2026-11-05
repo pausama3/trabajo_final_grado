@@ -7,9 +7,9 @@ import jakarta.persistence.*;
 @Table(name = "especialidad")// el nombre de la tabla en la BD
 public class Especialidad {
 	
-	@Id // PK
-	@GeneratedValue(strategy = GenerationType.IDENTITY)//auto_increment
-	@Column(name = "id")
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "id_especialidad")
 	private int id;
 	
 	@Column(name = "nombre_especialidad", nullable = false, length = 50 )

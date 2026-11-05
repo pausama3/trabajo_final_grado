@@ -7,9 +7,9 @@ import java.time.LocalDate; // Importamos LocalDate para fechas sin hora
 @Table(name = "paciente") // el nombre de la tabla en la BD
 public class Paciente {
 
-	@Id // PK
-	@GeneratedValue(strategy = GenerationType.IDENTITY) // auto_increment
-	@Column(name= "id")
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "id_paciente")
 	private int id;
 	
 	@Column(name = "dni", nullable = false, length = 9)
@@ -27,16 +27,16 @@ public class Paciente {
 	@Column(name = "email", nullable = true, length = 100)
 	private String email;
 	
-	@Column(name = "direccion", nullable = true, length = 50)
+	@Column(name = "direccion", nullable = true, length = 255)
 	private String direccion;
 	
 	@Column(name = "fecha_nacimiento", nullable = true)
 	private LocalDate fecha_nacimiento; // Usamos LocalDate
 	
-	@Column(name = "alergias", nullable = true, length = 50)
+	@Column(name = "alergias", nullable = true, length = 255)
 	private String alergias;
 	
-	@Column(name = "activo", nullable = false, columnDefinition = "boolean default true")
+	@Column(name = "activo", nullable = false)
 	private boolean activo = true; 
 	
 	// Constructores
