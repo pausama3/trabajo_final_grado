@@ -31,25 +31,30 @@ public class Historial_Medico {
 	// Type: datetime | Null: YES | Default: CURRENT_TIMESTAMP
 	@Column(name = "fecha_registro", nullable = true, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime fecha_registro = LocalDateTime.now();
+	
+	@Column(name = "activo", nullable = false)
+	private boolean activo = true;
 
 	// Constructores
 	public Historial_Medico() {
 	}
 
-	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento) {
+	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento, boolean activo) {
 		this.paciente = paciente;
 		this.cita = cita;
 		this.diagnostico = diagnostico;
 		this.tratamiento = tratamiento;
 		this.fecha_registro = LocalDateTime.now();
+		this.activo = activo;
 	}
 
-	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento, LocalDateTime fecha_registro) {
+	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento, LocalDateTime fecha_registro,  boolean activo) {
 		this.paciente = paciente;
 		this.cita = cita;
 		this.diagnostico = diagnostico;
 		this.tratamiento = tratamiento;
 		this.fecha_registro = fecha_registro;
+		this.activo = activo;
 	}
 
 	// Getters
@@ -59,6 +64,7 @@ public class Historial_Medico {
 	public String getDiagnostico() { return diagnostico; }
 	public String getTratamiento() { return tratamiento; }
 	public LocalDateTime getFecha_registro() { return fecha_registro; }
+	public boolean isActivo() { return activo; }
 
 	// Setters 
 	public void setPaciente(Paciente paciente) { this.paciente = paciente; }
@@ -66,4 +72,5 @@ public class Historial_Medico {
 	public void setDiagnostico(String diagnostico) { this.diagnostico = diagnostico; }
 	public void setTratamiento(String tratamiento) { this.tratamiento = tratamiento; }
 	public void setFecha_registro(LocalDateTime fecha_registro) { this.fecha_registro = fecha_registro; }
+	public void setActivo(boolean activo) { this.activo = activo; }
 }

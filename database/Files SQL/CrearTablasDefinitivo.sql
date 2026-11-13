@@ -71,7 +71,8 @@ CREATE TABLE historial_medico (
     diagnostico    TEXT NOT NULL,
     tratamiento    TEXT,
     fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_historial_cita UNIQUE (id_cita),      -- una cita, como máximo un informe
+    activo         TINYINT(1) NOT NULL DEFAULT 1, 
+    CONSTRAINT uq_historial_cita UNIQUE (id_cita),
     FOREIGN KEY (id_paciente) REFERENCES paciente(id_paciente),
     FOREIGN KEY (id_cita)     REFERENCES cita(id_cita)
 );
