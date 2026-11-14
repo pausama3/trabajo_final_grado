@@ -4,7 +4,8 @@ use medmanager;
 CREATE TABLE especialidad (
     id_especialidad     INT NOT NULL PRIMARY KEY AUTO_INCREMENT,
     nombre_especialidad VARCHAR(50) NOT NULL,
-    descripcion         VARCHAR(255)
+    descripcion         VARCHAR(255),
+    CONSTRAINT uq_especialidad_nombre UNIQUE (nombre_especialidad)
 );
  
 CREATE TABLE paciente (
