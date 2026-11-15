@@ -16,7 +16,7 @@ public class ClienteSocket {
 
     private static final ClienteSocket INSTANCIA = new ClienteSocket();
 
-    public static ClienteSocket getInstancia() {
+    public static ClienteSocket getInstance() {
         return INSTANCIA;
     }
 
@@ -31,7 +31,29 @@ public class ClienteSocket {
     private TrabajadorDTO usuarioActual;   // quién ha iniciado sesión (null = nadie)
 
     private ClienteSocket() { }
-
+    
+    public TrabajadorDTO enviarPeticion(PaqueteRed peticion)
+            throws IOException, ClassNotFoundException, ErrorServidorException {
+        usuarioActual = (TrabajadorDTO) pedir(peticion);
+        return usuarioActual;
+    }
+    
+    public synchronized Object pedir(PaqueteRed peticion)
+            throws IOException, ClassNotFoundException, ErrorServidorException {
+        try {
+            conectar();
+            out.writeObject(peticion);
+            out.flush();
+            PaqueteRed respuesta = (PaqueteRed) in.readObject();
+            if (Acciones.ERROR.equals(respuesta.getAccion())) {
+                throw new ErrorServidorException(String.valueOf(respuesta.getPayload()));
+            }
+            return respuesta.getPayload();
+        } catch (IOException | ClassNotFoundException e) {
+            cerrar();   // la conexión ya no es fiable: la próxima petición abrirá otra
+            throw e;
+        }
+    }
     public synchronized void conectar() throws IOException {
         if (socket != null && !socket.isClosed()) {
             return;   // ya estamos conectados
@@ -44,35 +66,6 @@ public class ClienteSocket {
         out.flush();
         in = new ObjectInputStream(socket.getInputStream());      // ...y después in
     }
-
-    /**
-     * Envía una acción y devuelve el payload de la respuesta.
-     * Si el servidor responde ERROR lanza ErrorServidorException con su mensaje.
-     * Se bloquea esperando al servidor: NUNCA llamarlo desde el hilo de Swing (usar SwingWorker).
-     */
-    public synchronized Object pedir(String accion, Object payload)
-            throws IOException, ClassNotFoundException, ErrorServidorException {
-        try {
-            conectar();
-            out.writeObject(new PaqueteRed(accion, payload));
-            out.flush();
-            PaqueteRed respuesta = (PaqueteRed) in.readObject();
-            if (Acciones.ERROR.equals(respuesta.getAccion())) {
-                throw new ErrorServidorException(String.valueOf(respuesta.getPayload()));
-            }
-            return respuesta.getPayload();
-        } catch (IOException | ClassNotFoundException e) {
-            cerrar();   // la conexión ya no es fiable: la próxima petición abrirá otra
-            throw e;
-        }
-    }
-
-    public TrabajadorDTO login(String usuario, String clave)
-            throws IOException, ClassNotFoundException, ErrorServidorException {
-        usuarioActual = (TrabajadorDTO) pedir(Acciones.LOGIN, new LoginDTO(usuario, clave));
-        return usuarioActual;
-    }
-
     public TrabajadorDTO getUsuarioActual() {
         return usuarioActual;
     }
