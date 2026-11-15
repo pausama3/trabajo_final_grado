@@ -39,14 +39,33 @@ public class ManejadorCliente implements Runnable {
                     continue;
                 }
                 PaqueteRed paquete = (PaqueteRed) recibido;
-                System.out.println("Acción recibida: " + paquete.getAccion());
+                String accion = paquete.getAccion();
+                System.out.println("Acción recibida: " + accion);
 
-                switch (paquete.getAccion()) {
+                // ---- GUARDIÁN DE PERMISOS: se ejecuta antes de cualquier acción ----
+                if (!Acciones.LOGIN.equals(accion)) {
+                    if (sesion == null) {
+                        responder(out, Acciones.ERROR, "Debes iniciar sesión");
+                        continue;
+                    }
+                    if (!Permisos.puede(sesion.getRol(), accion)) {
+                        System.out.println("⛔ " + sesion.getUsuario() + " (" + sesion.getRol()
+                                + ") sin permiso para " + accion);
+                        responder(out, Acciones.ERROR, "No tienes permiso para esta acción");
+                        continue;
+                    }
+                }
+                // --------------------------------------------------------------------
+
+                switch (accion) {
                     case Acciones.LOGIN:
                         procesarLogin(paquete, out);
                         break;
+                    case Acciones.BUSCAR_PACIENTES:   // temporal, hasta tener PacienteDAO
+                        responder(out, Acciones.OK, "permitido (aún sin implementar)");
+                        break;
                     default:
-                        responder(out, Acciones.ERROR, "Acción desconocida: " + paquete.getAccion());
+                        responder(out, Acciones.ERROR, "Acción desconocida: " + accion);
                 }
             }
 
@@ -73,11 +92,13 @@ public class ManejadorCliente implements Runnable {
         Trabajador trabajador = trabajadorDAO.autenticar(login.getUsuario(), login.getPassword());
 
         if (trabajador == null) {
+            System.out.println("❌ Login fallido para: " + login.getUsuario());
             sesion = null;
             responder(out, Acciones.ERROR, "Usuario o contraseña incorrectos");
             return;
         }
         sesion = trabajador;   // el servidor recuerda quién es y qué rol tiene
+        System.out.println("✅ Login correcto: " + trabajador.getUsuario() + " (" + trabajador.getRol() + ")");
         TrabajadorDTO dto = new TrabajadorDTO(
             trabajador.getId_trabajador(), trabajador.getNombre(),
             trabajador.getApellidos(), trabajador.getRol().name());

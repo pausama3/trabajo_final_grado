@@ -6,4 +6,7 @@ public final class Acciones {
     public static final String LOGIN = "LOGIN";
     public static final String OK    = "OK";
     public static final String ERROR = "ERROR";
+
+    public static final String BUSCAR_PACIENTES = "BUSCAR_PACIENTES";
+    public static final String GUARDAR_INFORME  = "GUARDAR_INFORME";
 }
