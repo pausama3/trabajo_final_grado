@@ -67,7 +67,7 @@ h1{font-size:20px;margin:0 0 2px}
 <script>
 const TAGS={servidor:'Servidor',bd:'Base de datos',escritorio:'Escritorio',android:'Android',memoria:'Memoria'};
 const COLS=[['todo','Pendiente'],['doing','En curso'],['done','Hecho']];
-const KEY='medmanager-kanban-v1';
+const KEY='medmanager-kanban-v2';
 let n=0;const T=(title,col,tag,due,hot)=>({id:++n,title,col,tag,due:due||'',hot:!!hot});
 function seed(){n=0;return[
 T('Maven + paquetes, HibernateUtil y ServerSocket con un hilo por cliente','done','servidor'),
@@ -80,14 +80,16 @@ T('Datos de prueba cargados (4 trabajadores, 2 pacientes, 2 citas)','done','bd')
 T('jBCrypt, PaqueteRed, Acciones y DTO (login, trabajador, paciente, cita, historial)','done','servidor'),
 T('ManejadorCliente con ObjectStreams, bucle de peticiones y sesión por conexión','done','servidor'),
 T('TrabajadorDAO + login con BCrypt probado con ClientePrueba (captura para el §8)','done','servidor'),
-T('Permisos por rol: clase Permisos + guardián en ManejadorCliente (denegar por defecto)','doing','servidor','2026-11-16',true),
-T('Servidor: .gitignore, URL en minúsculas, show_sql=false, quitar hibernate.dialect y commit','todo','servidor','2026-11-16'),
-T('Swing: ClienteSocket (Singleton) + LoginFrame; copiar el paquete comun','todo','escritorio','2026-11-16'),
+T('Permisos por rol: clase Permisos + guardián en ManejadorCliente (denegar por defecto)','done','servidor'),
+T('Swing: ClienteSocket (Singleton) + LoginFrame; copiar el paquete comun','done','escritorio'),
+T('Swing: Dashboard con menú según el rol (DashboardMedico / DashboardRecepcion)','done','escritorio'),
+T('Commit del trabajo en curso: PacienteDAO, Conversor, CitaDTO.nombrePaciente y diálogo del médico','todo','servidor','2026-11-16',true),
+T('hibernate.cfg.xml: URL en minúsculas, show_sql=false y quitar hibernate.dialect (.gitignore ya hecho)','todo','servidor','2026-11-16'),
+T('Limpiar ficheros ~$ y .tmp de Word; añadir ~$*, *.tmp y .tmp.drivedownload al .gitignore','todo','memoria','2026-11-16'),
 T('Probar triggers de UPDATE y rechazos con los datos de prueba (capturas para el §8)','todo','bd','2026-11-17'),
-T('Convertir entidad a DTO en una clase aparte; recepción no recibe alergias (RN3)','todo','servidor','2026-11-17'),
-T('PacienteDAO + acciones BUSCAR_PACIENTES, VER_PACIENTE, GUARDAR_PACIENTE y BAJA_PACIENTE','todo','servidor','2026-11-18',true),
-T('Swing: Dashboard con menú según el rol','todo','escritorio','2026-11-18'),
-T('Swing: pacientes (buscar, alta, modificar, baja lógica)','todo','escritorio','2026-11-20'),
+T('Conversor entidad→DTO (aDTO con/sin alergias, RN3): escrito, falta usarlo en ManejadorCliente','doing','servidor','2026-11-17'),
+T('PacienteDAO (hecho) + acciones BUSCAR_PACIENTES (ahora es un stub), VER_PACIENTE, GUARDAR_PACIENTE y BAJA_PACIENTE','doing','servidor','2026-11-18',true),
+T('Swing: pacientes (la búsqueda ya llama a BUSCAR_PACIENTES; falta alta, modificar, baja lógica y quitar datos de ejemplo)','doing','escritorio','2026-11-20'),
 T('Memoria §7: reescribir con mis palabras la creación de la BD; capturas al §8','todo','memoria','2026-11-20'),
 T('Prueba de concurrencia: PruebaConcurrencia y dos recepcionistas con el mismo hueco','todo','servidor','2026-11-21'),
 T('TrabajadorDAO: listar médicos con su especialidad (para elegir médico al crear cita)','todo','servidor','2026-11-21'),
@@ -96,7 +98,8 @@ T('Propagar errores de BD (1062, 1644, 3819) como mensajes claros al cliente','t
 T('Swing: agenda y citas (recepción)','todo','escritorio','2026-11-24'),
 T('HistorialMedicoDAO + acciones: ver historial, guardar informe, cerrar cita y alergias (solo médico, filtra activo)','todo','servidor','2026-11-26'),
 T('Cifrado SSLSocket o documentarlo como mejora; filtro de deserialización (lista blanca)','todo','servidor','2026-11-27'),
-T('Swing: historial clínico y cierre de cita (médico)','todo','escritorio','2026-11-28'),
+T('Swing: historial y cierre de cita (médico): diálogo con diagnóstico, tratamiento y alergias hecho; falta enviarlo (GUARDAR_INFORME)','doing','escritorio','2026-11-28'),
+T('Decidir dónde se cancela una cita: el diálogo del médico ya no ofrece CANCELADA','todo','escritorio','2026-11-24'),
 T('Android: proyecto Kotlin (minSdk 26) + layouts XML + login','todo','android','2026-11-30'),
 T('Android: búsqueda por DNI/nombre + ficha rápida','todo','android','2026-12-01'),
 T('Pruebas JUnit del servidor','todo','servidor','2026-12-02'),

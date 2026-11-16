@@ -12,8 +12,12 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
 import javax.swing.BoxLayout;
+import javax.swing.JOptionPane;
+import javax.swing.SwingWorker;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -22,8 +26,10 @@ import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.MatteBorder;
 
+import com.medmanager.comun.PaqueteRed;
 import com.medmanager.comun.TrabajadorDTO;
 import com.medmanager.escritorio.red.ClienteSocket;
+import com.medmanager.escritorio.red.ErrorServidorException;
 
 /**
  * Estructura común de las pantallas principales: cabecera, menú lateral y zona central.
@@ -61,6 +67,46 @@ public abstract class DashboardBase extends JFrame {
         if (botones.size() == 1) {
             mostrar(texto, b);   // la primera pantalla añadida es la que se ve al abrir
         }
+    }
+
+    /**
+     * Envía una petición al servidor en un hilo secundario (SwingWorker) para no congelar la ventana.
+     * Si va bien, 'alRecibir' se ejecuta en el hilo de Swing con la respuesta.
+     * Si falla, se muestra el error y se ejecuta 'siFalla' (puede ser null).
+     */
+    @SuppressWarnings("unchecked")
+    protected <T> void pedirAlServidor(PaqueteRed peticion, Consumer<T> alRecibir, Runnable siFalla) {
+        new SwingWorker<Object, Void>() {
+            @Override
+            protected Object doInBackground() throws Exception {
+                return ClienteSocket.getInstance().pedir(peticion);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    alRecibir.accept((T) get());
+                } catch (ExecutionException e) {
+                    Throwable causa = e.getCause();
+                    if (causa instanceof ErrorServidorException) {
+                        // El servidor ha respondido ERROR: su mensaje ya es legible
+                        JOptionPane.showMessageDialog(DashboardBase.this, causa.getMessage(),
+                                "No se pudo completar", JOptionPane.WARNING_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(DashboardBase.this,
+                                "No hay conexión con el servidor: " + causa.getMessage(),
+                                "Error de conexión", JOptionPane.ERROR_MESSAGE);
+                    }
+                    if (siFalla != null) siFalla.run();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }.execute();
+    }
+
+    protected <T> void pedirAlServidor(PaqueteRed peticion, Consumer<T> alRecibir) {
+        pedirAlServidor(peticion, alRecibir, null);
     }
 
     private void mostrar(String carta, JButton activo) {

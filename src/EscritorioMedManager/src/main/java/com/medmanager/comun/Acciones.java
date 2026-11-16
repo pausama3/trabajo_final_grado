@@ -7,6 +7,10 @@ public final class Acciones {
     public static final String OK    = "OK";
     public static final String ERROR = "ERROR";
 
-    public static final String BUSCAR_PACIENTES = "BUSCAR_PACIENTES";
-    public static final String GUARDAR_INFORME  = "GUARDAR_INFORME";
+    public static final String BUSCAR_PACIENTES = "BUSCAR_PACIENTES";   // payload: String  -> List<PacienteDTO>
+
+    // ---- Médico ----
+    public static final String AGENDA_MEDICO   = "AGENDA_MEDICO";       // payload: LocalDate  -> List<CitaDTO>
+    public static final String INFORMES_MEDICO = "INFORMES_MEDICO";     // payload: null       -> List<HistorialDTO>
+    public static final String GUARDAR_INFORME = "GUARDAR_INFORME";     // payload: InformeDTO -> HistorialDTO
 }
