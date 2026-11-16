@@ -12,6 +12,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import com.medmanager.comun.Acciones;
@@ -101,6 +102,8 @@ public class LoginFrame extends JFrame {
 	            try {
 	                TrabajadorDTO t = get();   // el resultado de doInBackground
 	                RespuestaLabel.setText("Bienvenido/a " + t.getNombre() + " (" + t.getRol() + ")");
+	                abrirPantallaPrincipal(t);
+	                
 	            } catch (ExecutionException e) {   // doInBackground lanzó una excepción
 	                Throwable causa = e.getCause();
 	                if (causa instanceof ErrorServidorException) {
@@ -116,5 +119,20 @@ public class LoginFrame extends JFrame {
 	            btn_IniciarSesion.setEnabled(true);
 	        }
 	    }.execute();
+	}
+	private void abrirPantallaPrincipal(TrabajadorDTO t) {
+	    switch (t.getRol()) {
+	        case "MEDICO":
+	            new DashboardMedico(t).setVisible(true);
+	            dispose();
+	            break;
+	        case "RECEPCIONISTA":
+	            new DashboardRecepcion(t).setVisible(true);
+	            dispose();
+	            break;
+	        default:   // ENFERMERO u otro rol: usan la app móvil
+	            RespuestaLabel.setText("Esta aplicación es para médicos y recepción");
+	            ClienteSocket.getInstance().cerrar();
+	    }
 	}
 }
