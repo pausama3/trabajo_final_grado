@@ -9,11 +9,9 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -44,8 +42,6 @@ public class DashboardMedico extends DashboardBase {
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final DateTimeFormatter DIA_LARGO =
-            DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'de' yyyy", new Locale("es", "ES"));
 
     private final PanelBase agenda;
     private final PanelBase pacientes;
@@ -53,8 +49,7 @@ public class DashboardMedico extends DashboardBase {
 
     // Las citas que se ven en la agenda, en el mismo orden que las filas (así sabemos el id de cada fila)
     private List<CitaDTO> citasAgenda = new ArrayList<>();
-    private LocalDate diaAgenda = LocalDate.now();
-    private final JLabel lblDia = new JLabel("", SwingConstants.CENTER);
+    private final SelectorDia selectorDia;
 
     public DashboardMedico(TrabajadorDTO usuario) {
         super(usuario, "Médico");
@@ -62,7 +57,8 @@ public class DashboardMedico extends DashboardBase {
         // 1. Agenda del día (con navegación entre días)
         agenda = new PanelBase("Mi agenda", "Tus citas programadas, por día",
                 new String[] {"Hora", "Paciente", "Motivo", "Observaciones de enfermería", "Estado", "Acción"}, false);
-        agenda.add(crearBarraDias(), BorderLayout.SOUTH);
+        selectorDia = new SelectorDia(this::cargarAgenda);
+        agenda.add(selectorDia, BorderLayout.SOUTH);
         configurarColumnaAccion();
         anadirPantalla("Agenda", agenda);
 
@@ -73,47 +69,22 @@ public class DashboardMedico extends DashboardBase {
         pacientes.getTxtBusqueda().addActionListener(e -> buscarPacientes());   // Enter también busca
         anadirPantalla("Pacientes", pacientes);
 
-        // 3. Informes que ha redactado este médico
-        informes = new PanelBase("Informes", "Informes de las consultas que has atendido",
-                new String[] {"Paciente", "Fecha", "Diagnóstico", "Tratamiento"}, false);
+        // 3. Informes: empieza vacío y se rellena al buscar un paciente
+        informes = new PanelBase("Informes", "Busca un paciente por DNI, nombre o apellidos para ver su historial",
+                new String[] {"Paciente", "Fecha", "Médico", "Diagnóstico", "Tratamiento"}, true);
+        informes.getBtnBuscar().addActionListener(e -> buscarInformes());
+        informes.getTxtBusqueda().addActionListener(e -> buscarInformes());   // Enter también busca
         anadirPantalla("Informes", informes);
 
         // Carga inicial
         cargarAgenda();
-        cargarInformes();
         buscarPacientes();
     }
 
     // =================================================================== AGENDA
 
-    private JPanel crearBarraDias() {
-        JButton btnAnterior = new JButton("◀ Anterior");
-        JButton btnHoy = new JButton("Hoy");
-        JButton btnSiguiente = new JButton("Siguiente ▶");
-        for (JButton b : new JButton[] {btnAnterior, btnHoy, btnSiguiente}) {
-            b.setFont(Estilo.FUENTE);
-        }
-        btnAnterior.addActionListener(e -> { diaAgenda = diaAgenda.minusDays(1); cargarAgenda(); });
-        btnHoy.addActionListener(e -> { diaAgenda = LocalDate.now(); cargarAgenda(); });
-        btnSiguiente.addActionListener(e -> { diaAgenda = diaAgenda.plusDays(1); cargarAgenda(); });
-
-        lblDia.setFont(Estilo.FUENTE_NEGRITA);
-        lblDia.setForeground(Estilo.TEXTO);
-
-        JPanel barra = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-        barra.setOpaque(false);
-        barra.add(btnAnterior);
-        barra.add(lblDia);
-        barra.add(btnHoy);
-        barra.add(btnSiguiente);
-        return barra;
-    }
-
     private void cargarAgenda() {
-        String dia = diaAgenda.format(DIA_LARGO);
-        lblDia.setText(Character.toUpperCase(dia.charAt(0)) + dia.substring(1));
-
-        this.<List<CitaDTO>>pedirAlServidor(new PaqueteRed(Acciones.AGENDA_MEDICO, diaAgenda), lista -> {
+        this.<List<CitaDTO>>pedirAlServidor(new PaqueteRed(Acciones.AGENDA_MEDICO, selectorDia.getDia()), lista -> {
             citasAgenda = lista;
             agenda.getModelo().setRowCount(0);
             for (CitaDTO c : lista) {
@@ -246,7 +217,9 @@ public class DashboardMedico extends DashboardBase {
                     guardado -> {
                         dialogo.dispose();
                         cargarAgenda();     // la cita pasa a REALIZADA
-                        cargarInformes();   // aparece el informe nuevo
+                        if (!informes.getTxtBusqueda().getText().isBlank()) {
+                            buscarInformes();   // si había una búsqueda abierta, se actualiza
+                        }
                     },
                     () -> btnGuardar.setEnabled(true));
         });
@@ -301,13 +274,23 @@ public class DashboardMedico extends DashboardBase {
 
     // =================================================================== INFORMES
 
-    private void cargarInformes() {
-        this.<List<HistorialDTO>>pedirAlServidor(new PaqueteRed(Acciones.INFORMES_MEDICO), lista -> {
+    private void buscarInformes() {
+        String texto = informes.getTxtBusqueda().getText().trim();
+        informes.getModelo().setRowCount(0);
+        if (texto.isEmpty()) {
+            return;   // sin texto la tabla se queda en blanco
+        }
+        this.<List<HistorialDTO>>pedirAlServidor(new PaqueteRed(Acciones.BUSCAR_INFORMES, texto), lista -> {
             informes.getModelo().setRowCount(0);
+            if (lista.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No hay informes para «" + texto + "».",
+                        "Sin resultados", JOptionPane.INFORMATION_MESSAGE);
+            }
             for (HistorialDTO h : lista) {
                 informes.getModelo().addRow(new Object[] {
                     h.getNombrePaciente(),
                     h.getFechaRegistro() != null ? h.getFechaRegistro().format(FECHA_HORA) : "",
+                    h.getNombreMedico(),
                     h.getDiagnostico(),
                     textoONada(h.getTratamiento(), "")
                 });

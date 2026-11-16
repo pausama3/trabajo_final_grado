@@ -12,14 +12,21 @@ import com.medmanager.ServidorMedManager.util.HibernateUtil;
 
 public class HistorialMedicoDAO implements IDAO<Historial_Medico> {
 
-    /** Informes activos de las citas atendidas por un médico, del más reciente al más antiguo. */
-    public List<Historial_Medico> informesDeMedico(int idTrabajador) {
+    /**
+     * Informes activos de los pacientes cuyo DNI, nombre, apellidos o nombre completo contienen el texto.
+     * Ordenados por paciente y, dentro de cada uno, del más reciente al más antiguo (máximo 200).
+     */
+    public List<Historial_Medico> buscarPorPaciente(String texto) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             return session.createQuery(
-                    "FROM Historial_Medico h JOIN FETCH h.paciente JOIN FETCH h.cita c "
-                    + "WHERE h.activo = true AND c.trabajador.id = :med "
-                    + "ORDER BY h.fecha_registro DESC", Historial_Medico.class)
-                    .setParameter("med", idTrabajador)
+                    "FROM Historial_Medico h JOIN FETCH h.paciente p "
+                    + "JOIN FETCH h.cita c JOIN FETCH c.trabajador "   // el médico, para mostrar quién lo redactó
+                    + "WHERE h.activo = true AND ("
+                    + "p.dni LIKE :t OR p.nombre LIKE :t OR p.apellidos LIKE :t "
+                    + "OR concat(p.nombre, ' ', p.apellidos) LIKE :t) "
+                    + "ORDER BY p.apellidos, p.nombre, h.fecha_registro DESC", Historial_Medico.class)
+                    .setParameter("t", "%" + texto + "%")
+                    .setMaxResults(200)
                     .list();
         }
     }

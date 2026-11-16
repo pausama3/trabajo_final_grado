@@ -18,10 +18,17 @@ public final class Permisos {
                 EnumSet.of(Rol.RECEPCIONISTA, Rol.MEDICO, Rol.ENFERMERO));
         PERMITIDOS.put(Acciones.AGENDA_MEDICO,
                 EnumSet.of(Rol.MEDICO));
-        PERMITIDOS.put(Acciones.INFORMES_MEDICO,
+        PERMITIDOS.put(Acciones.BUSCAR_INFORMES,
                 EnumSet.of(Rol.MEDICO));
         PERMITIDOS.put(Acciones.GUARDAR_INFORME,
                 EnumSet.of(Rol.MEDICO));
+
+        // Recepción
+        for (String accion : new String[] {Acciones.AGENDA_CLINICA, Acciones.LISTAR_MEDICOS,
+                Acciones.CREAR_CITA, Acciones.CANCELAR_CITA,
+                Acciones.GUARDAR_PACIENTE, Acciones.BAJA_PACIENTE}) {
+            PERMITIDOS.put(accion, EnumSet.of(Rol.RECEPCIONISTA));
+        }
     }
 
     // Denegar por defecto: si la acción no está en el mapa, nadie puede ejecutarla.

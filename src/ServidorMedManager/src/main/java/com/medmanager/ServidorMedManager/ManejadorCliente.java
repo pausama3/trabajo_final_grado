@@ -7,6 +7,7 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 
 import com.medmanager.ServidorMedManager.dao.CitaDAO;
@@ -85,11 +86,29 @@ public class ManejadorCliente implements Runnable {
                         case Acciones.AGENDA_MEDICO:
                             agendaMedico(paquete, out);
                             break;
-                        case Acciones.INFORMES_MEDICO:
-                            informesMedico(out);
+                        case Acciones.BUSCAR_INFORMES:
+                            buscarInformes(paquete, out);
                             break;
                         case Acciones.GUARDAR_INFORME:
                             guardarInforme(paquete, out);
+                            break;
+                        case Acciones.AGENDA_CLINICA:
+                            agendaClinica(paquete, out);
+                            break;
+                        case Acciones.LISTAR_MEDICOS:
+                            listarMedicos(out);
+                            break;
+                        case Acciones.CREAR_CITA:
+                            crearCita(paquete, out);
+                            break;
+                        case Acciones.CANCELAR_CITA:
+                            cancelarCita(paquete, out);
+                            break;
+                        case Acciones.GUARDAR_PACIENTE:
+                            guardarPaciente(paquete, out);
+                            break;
+                        case Acciones.BAJA_PACIENTE:
+                            bajaPaciente(paquete, out);
                             break;
                         default:
                             responder(out, Acciones.ERROR, "Acción desconocida: " + accion);
@@ -100,7 +119,7 @@ public class ManejadorCliente implements Runnable {
                 } catch (RuntimeException e) {
                     // Error de BD u otro inesperado: se avisa al cliente y la conexión sigue viva
                     System.err.println("Error procesando " + accion + ": " + e);
-                    responder(out, Acciones.ERROR, "No se pudo completar la operación en el servidor");
+                    responder(out, Acciones.ERROR, ErroresBD.mensajeParaUsuario(e));
                 }
             }
 
@@ -164,10 +183,14 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, resultado);
     }
 
-    private void informesMedico(ObjectOutputStream out) throws IOException {
+    /** Historial completo (de cualquier médico) de los pacientes que coinciden con el texto. */
+    private void buscarInformes(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        String texto = paquete.getPayload() instanceof String ? ((String) paquete.getPayload()).trim() : "";
         ArrayList<HistorialDTO> resultado = new ArrayList<>();
-        for (Historial_Medico h : historialDAO.informesDeMedico(sesion.getId_trabajador())) {
-            resultado.add(Conversor.aDTO(h));
+        if (!texto.isEmpty()) {   // sin texto no se devuelve nada: no se lista el historial de toda la clínica
+            for (Historial_Medico h : historialDAO.buscarPorPaciente(texto)) {
+                resultado.add(Conversor.aDTO(h));
+            }
         }
         responder(out, Acciones.OK, resultado);
     }
@@ -188,6 +211,126 @@ public class ManejadorCliente implements Runnable {
                 vacioANull(inf.getTratamiento()), vacioANull(inf.getAlergias()));
         System.out.println("📝 Informe guardado para la cita " + inf.getIdCita() + " por " + sesion.getUsuario());
         responder(out, Acciones.OK, Conversor.aDTO(guardado));
+    }
+
+    // ---------------------------------------------------------------- Recepción
+
+    private void agendaClinica(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        LocalDate dia = paquete.getPayload() instanceof LocalDate ? (LocalDate) paquete.getPayload() : LocalDate.now();
+        ArrayList<CitaDTO> resultado = new ArrayList<>();
+        for (Cita c : citaDAO.agendaDelDia(dia)) {
+            resultado.add(Conversor.aDTO(c, false));   // RN3: recepción no ve alergias
+        }
+        responder(out, Acciones.OK, resultado);
+    }
+
+    private void listarMedicos(ObjectOutputStream out) throws IOException {
+        ArrayList<TrabajadorDTO> resultado = new ArrayList<>();
+        for (Trabajador t : trabajadorDAO.listarMedicos()) {
+            resultado.add(Conversor.aDTO(t));
+        }
+        responder(out, Acciones.OK, resultado);
+    }
+
+    private void crearCita(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof CitaDTO)) {
+            responder(out, Acciones.ERROR, "Datos de la cita no válidos");
+            return;
+        }
+        CitaDTO dto = (CitaDTO) paquete.getPayload();
+        LocalDateTime fh = dto.getFechaHora();
+        if (fh == null) {
+            throw new IllegalArgumentException("Falta la fecha y hora de la cita");
+        }
+        if (fh.getMinute() % 15 != 0 || fh.getSecond() != 0 || fh.getNano() != 0) {
+            throw new IllegalArgumentException("Las citas van en franjas de 15 minutos (:00, :15, :30, :45)");
+        }
+        if (fh.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("No se puede dar una cita en una fecha u hora ya pasada");
+        }
+        String motivo = vacioANull(dto.getMotivoConsulta());
+        if (motivo != null && motivo.length() > 255) {
+            throw new IllegalArgumentException("El motivo no puede superar 255 caracteres");
+        }
+        Cita cita = citaDAO.crear(dto.getIdPaciente(), dto.getIdTrabajador(), fh, motivo);
+        System.out.println("📅 Cita " + cita.getId_cita() + " creada por " + sesion.getUsuario());
+        responder(out, Acciones.OK, Conversor.aDTO(cita, false));
+    }
+
+    private void cancelarCita(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof Integer)) {
+            responder(out, Acciones.ERROR, "Cita no válida");
+            return;
+        }
+        Cita cita = citaDAO.cancelar((Integer) paquete.getPayload());
+        System.out.println("🚫 Cita " + cita.getId_cita() + " cancelada por " + sesion.getUsuario());
+        responder(out, Acciones.OK, Conversor.aDTO(cita, false));
+    }
+
+    /** Alta (id 0) o modificación de los datos personales. Las alergias nunca se tocan desde aquí (RN3). */
+    private void guardarPaciente(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof PacienteDTO)) {
+            responder(out, Acciones.ERROR, "Datos del paciente no válidos");
+            return;
+        }
+        PacienteDTO dto = (PacienteDTO) paquete.getPayload();
+        String dni = vacioANull(dto.getDni());
+        String nombre = vacioANull(dto.getNombre());
+        String apellidos = vacioANull(dto.getApellidos());
+        String telefono = vacioANull(dto.getTelefono());
+        String email = vacioANull(dto.getEmail());
+        String direccion = vacioANull(dto.getDireccion());
+
+        if (dni == null || !dni.toUpperCase().matches("\\d{8}[A-Z]|[XYZ]\\d{7}[A-Z]")) {
+            throw new IllegalArgumentException("El DNI/NIE no es válido (ej.: 12345678A o X1234567B)");
+        }
+        dni = dni.toUpperCase();
+        comprobarTexto(nombre, "nombre", 50, true);
+        comprobarTexto(apellidos, "apellidos", 100, true);
+        comprobarTexto(telefono, "teléfono", 15, false);
+        comprobarTexto(email, "email", 100, false);
+        comprobarTexto(direccion, "dirección", 255, false);
+        if (email != null && !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+            throw new IllegalArgumentException("El email no es válido");
+        }
+        if (dto.getFechaNacimiento() != null && dto.getFechaNacimiento().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de nacimiento no puede ser futura");
+        }
+
+        Paciente guardado;
+        if (dto.getId() == 0) {
+            guardado = new Paciente(dni, dto.getFechaNacimiento(), nombre, apellidos, telefono,
+                    email, direccion, null, true);
+            pacienteDAO.save(guardado);
+            System.out.println("➕ Paciente " + dni + " dado de alta por " + sesion.getUsuario());
+        } else {
+            guardado = pacienteDAO.modificarDatos(dto.getId(), dni, nombre, apellidos, telefono,
+                    email, direccion, dto.getFechaNacimiento());
+            System.out.println("✏️ Paciente " + dni + " modificado por " + sesion.getUsuario());
+        }
+        responder(out, Acciones.OK, Conversor.aDTO(guardado, false));
+    }
+
+    private void bajaPaciente(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof Integer)) {
+            responder(out, Acciones.ERROR, "Paciente no válido");
+            return;
+        }
+        int canceladas = pacienteDAO.darDeBaja((Integer) paquete.getPayload());
+        System.out.println("➖ Paciente " + paquete.getPayload() + " dado de baja por " + sesion.getUsuario());
+        responder(out, Acciones.OK, canceladas == 0
+                ? "Paciente dado de baja."
+                : "Paciente dado de baja. Se han cancelado " + canceladas + " cita(s) pendiente(s).");
+    }
+
+    private static void comprobarTexto(String valor, String campo, int max, boolean obligatorio) {
+        if (valor == null) {
+            if (obligatorio) throw new IllegalArgumentException("El campo " + campo + " es obligatorio");
+            return;
+        }
+        if (valor.length() > max) {
+            throw new IllegalArgumentException("El campo " + campo + " no puede superar " + max + " caracteres");
+        }
     }
 
     private static String vacioANull(String s) {

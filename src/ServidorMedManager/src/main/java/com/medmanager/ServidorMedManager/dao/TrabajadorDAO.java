@@ -30,6 +30,17 @@ public class TrabajadorDAO implements IDAO<Trabajador> {
         }
     }
 
+    /** Todos los médicos con su especialidad, ordenados por apellidos (para elegir médico al dar cita). */
+    public List<Trabajador> listarMedicos() {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            return session.createQuery(
+                    "FROM Trabajador t LEFT JOIN FETCH t.especialidad "
+                    + "WHERE t.rol = :rol ORDER BY t.apellidos, t.nombre", Trabajador.class)
+                    .setParameter("rol", Trabajador.Rol.MEDICO)
+                    .list();
+        }
+    }
+
     @Override
     public void save(Trabajador entity) {
         Transaction tx = null;
