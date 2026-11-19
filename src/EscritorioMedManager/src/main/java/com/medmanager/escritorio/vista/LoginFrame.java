@@ -22,60 +22,77 @@ import com.medmanager.comun.TrabajadorDTO;
 import com.medmanager.escritorio.red.ClienteSocket;
 import com.medmanager.escritorio.red.ErrorServidorException;
 
+/**
+ * Ventana de inicio de sesión de la aplicación de escritorio.
+ * <p>
+ * Envía las credenciales al servidor en segundo plano y, según el rol del
+ * trabajador autenticado, abre el panel de médico o el de recepción.
+ */
 public class LoginFrame extends JFrame {
 	private static final long serialVersionUID = 1L;
 	private JTextField textField_Usuario;
 	private JPasswordField passwordField;
-	private JLabel RespuestaLabel;
+	private JLabel RespuestaLabel;          // mensajes de estado y de error para el usuario
 	private JButton btn_IniciarSesion;
-	
+
+	/** Construye la ventana y sus componentes (diseño con posiciones absolutas). */
 	public LoginFrame() {
 		setAlwaysOnTop(true);
 		setTitle("Medmanager");
 		setMinimumSize(new Dimension(600, 300));
-		setLocationRelativeTo(null);
-		
+		setLocationRelativeTo(null);   // centrada en pantalla
+
 		JPanel panel = new JPanel();
 		getContentPane().add(panel, BorderLayout.CENTER);
 		panel.setLayout(null);
-		
+
 		JLabel TituloLabel = new JLabel("Bienvenido a Medmanager");
 		TituloLabel.setBounds(114, 16, 199, 20);
 		panel.add(TituloLabel);
-		
+
+		// ---- Campo de usuario ----
 		textField_Usuario = new JTextField();
 		textField_Usuario.setColumns(10);
 		textField_Usuario.setBounds(199, 100, 146, 26);
 		panel.add(textField_Usuario);
-		
+
 		JLabel UsuarioLabel = new JLabel("Usuario");
 		UsuarioLabel.setBounds(94, 106, 63, 20);
 		panel.add(UsuarioLabel);
-		
+
+		// ---- Campo de contraseña ----
 		passwordField = new JPasswordField();
 		passwordField.setColumns(10);
 		passwordField.setBounds(199, 133, 146, 26);
 		panel.add(passwordField);
-		
+
 		JLabel ContraseñaLabel = new JLabel("Contraseña");
 		ContraseñaLabel.setBounds(94, 137, 85, 20);
 		panel.add(ContraseñaLabel);
-		
-		
-		
+
+
+
+		// ---- Botón de acceso y etiqueta de respuesta ----
 		btn_IniciarSesion = new JButton("Iniciar Sesion");
 		btn_IniciarSesion.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				intentarLogin();
 			}
 		});
-		
+
 		RespuestaLabel = new JLabel("");
 		RespuestaLabel.setBounds(158, 180, 411, 20);
 		panel.add(RespuestaLabel);
 		btn_IniciarSesion.setBounds(155, 216, 158, 29);
 		panel.add(btn_IniciarSesion);
-	}  
+	}
+
+	/**
+	 * Valida que los campos no estén vacíos y envía las credenciales al servidor.
+	 * <p>
+	 * La comunicación se hace en un {@link SwingWorker} para no bloquear la
+	 * interfaz; mientras dura, los campos y el botón quedan deshabilitados.
+	 */
 	public void intentarLogin() {
 	    String usuario = textField_Usuario.getText();
 	    String clave = new String(passwordField.getPassword());
@@ -83,6 +100,7 @@ public class LoginFrame extends JFrame {
 	        RespuestaLabel.setText("Usuario o contraseña vacío");
 	        return;
 	    }
+	    // Se bloquea el formulario para evitar envíos duplicados
 	    textField_Usuario.setEditable(false);
 	    passwordField.setEditable(false);
 	    btn_IniciarSesion.setEnabled(false);
@@ -103,7 +121,7 @@ public class LoginFrame extends JFrame {
 	                TrabajadorDTO t = get();   // el resultado de doInBackground
 	                RespuestaLabel.setText("Bienvenido/a " + t.getNombre() + " (" + t.getRol() + ")");
 	                abrirPantallaPrincipal(t);
-	                
+
 	            } catch (ExecutionException e) {   // doInBackground lanzó una excepción
 	                Throwable causa = e.getCause();
 	                if (causa instanceof ErrorServidorException) {
@@ -112,14 +130,22 @@ public class LoginFrame extends JFrame {
 	                    RespuestaLabel.setText("Error de conexión con el servidor");
 	                }
 	            } catch (InterruptedException e) {
-	                Thread.currentThread().interrupt();
+	                Thread.currentThread().interrupt();   // se conserva el estado de interrupción
 	            }
+	            // Pase lo que pase, se reactiva el formulario
 	            textField_Usuario.setEditable(true);
 	            passwordField.setEditable(true);
 	            btn_IniciarSesion.setEnabled(true);
 	        }
 	    }.execute();
 	}
+
+	/**
+	 * Abre el panel principal que corresponde al rol del trabajador y cierra
+	 * la ventana de login. Los roles sin panel de escritorio cierran la sesión.
+	 *
+	 * @param t trabajador autenticado
+	 */
 	private void abrirPantallaPrincipal(TrabajadorDTO t) {
 	    switch (t.getRol()) {
 	        case "MEDICO":

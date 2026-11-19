@@ -3,11 +3,17 @@ package com.medmanager.ServidorMedManager.modelo;
 import jakarta.persistence.*;
 import java.time.LocalDate; // Importamos LocalDate para fechas sin hora
 
+/**
+ * Entidad JPA que representa a un paciente de la clínica (tabla {@code paciente}).
+ * <p>
+ * Los pacientes no se borran: al darlos de baja se marca {@code activo = false}
+ * para conservar su historial médico.
+ */
 @Entity // indica que es una entidad de la BD
 @Table(name = "paciente") // el nombre de la tabla en la BD
 public class Paciente {
 
-	@Id
+	@Id   // clave primaria autoincremental
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "id_paciente")
 	private int id;
@@ -34,15 +40,18 @@ public class Paciente {
 	private LocalDate fecha_nacimiento; // Usamos LocalDate
 	
 	@Column(name = "alergias", nullable = true, length = 255)
-	private String alergias;
-	
+	private String alergias;   // dato clínico: solo visible para personal sanitario (RN3)
+
 	@Column(name = "activo", nullable = false)
-	private boolean activo = true; 
-	
+	private boolean activo = true;   // borrado lógico
+
 	// Constructores
-	public Paciente() {	
+
+	/** Constructor vacío exigido por JPA. */
+	public Paciente() {
 	}
-	
+
+	/** Crea un paciente nuevo (el id lo asigna la base de datos al guardarlo). */
 	public Paciente(String dni, LocalDate fecha_nacimiento, String nombre, String apellidos, String telefono, String email, String direccion, String alergias, boolean activo) {
 		this.dni = dni;
 		this.fecha_nacimiento = fecha_nacimiento;

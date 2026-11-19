@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
@@ -42,10 +43,15 @@ import com.medmanager.comun.PacienteDTO;
 import com.medmanager.comun.PaqueteRed;
 import com.medmanager.comun.TrabajadorDTO;
 
-/** Pantalla principal de recepción: agenda de la clínica, gestión de pacientes y alta de citas. */
+/**
+ * Pantalla principal de recepción: agenda de la clínica, gestión de pacientes y alta de citas.
+ * <p>
+ * Por la regla de negocio RN3, recepción nunca ve ni modifica las alergias de los pacientes.
+ */
 public class DashboardRecepcion extends DashboardBase {
     private static final long serialVersionUID = 1L;
 
+    // ---- Formatos de fecha y hora para mostrar en pantalla ----
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -56,13 +62,13 @@ public class DashboardRecepcion extends DashboardBase {
     // ---- Agenda ----
     private final PanelBase agenda;
     private final SelectorDia selectorDia;
-    private final JComboBox<TrabajadorDTO> cmbFiltroMedico = new JComboBox<>();
-    private List<CitaDTO> citasDelDia = new ArrayList<>();
+    private final JComboBox<TrabajadorDTO> cmbFiltroMedico = new JComboBox<>();   // elemento null = todos
+    private List<CitaDTO> citasDelDia = new ArrayList<>();   // todas las citas del día recibidas del servidor
     private final List<CitaDTO> citasVisibles = new ArrayList<>();   // mismas posiciones que las filas
 
     // ---- Pacientes ----
     private final PanelBase pacientes;
-    private final List<PacienteDTO> pacientesVisibles = new ArrayList<>();
+    private final List<PacienteDTO> pacientesVisibles = new ArrayList<>();   // mismas posiciones que las filas
 
     // ---- Registrar cita ----
     private final JTextField txtBuscarPacienteCita = campoTexto();
@@ -71,9 +77,14 @@ public class DashboardRecepcion extends DashboardBase {
     private final JSpinner spnFecha = new JSpinner(new SpinnerDateModel());
     private final JComboBox<LocalTime> cmbHora = new JComboBox<>();
     private final JTextField txtMotivo = campoTexto();
-    private final JLabel lblHuecos = new JLabel(" ");
+    private final JLabel lblHuecos = new JLabel(" ");   // informa de cuántas horas libres hay
     private final JButton btnRegistrarCita = new JButton("Registrar cita");
 
+    /**
+     * Construye las tres secciones de recepción y lanza la carga inicial de datos.
+     *
+     * @param usuario recepcionista que ha iniciado sesión
+     */
     public DashboardRecepcion(TrabajadorDTO usuario) {
         super(usuario, "Recepción");
 
@@ -109,6 +120,7 @@ public class DashboardRecepcion extends DashboardBase {
 
     // =================================================================== AGENDA
 
+    /** Barra inferior de la agenda: selector de día, filtro por médico y acciones sobre la cita seleccionada. */
     private JPanel crearBarraAgenda() {
         cmbFiltroMedico.setFont(Estilo.FUENTE);
         textoCombo(cmbFiltroMedico, m -> m.getNombre() + " " + m.getApellidos(), "Todos los médicos");
@@ -118,10 +130,15 @@ public class DashboardRecepcion extends DashboardBase {
         btnCancelar.setFont(Estilo.FUENTE);
         btnCancelar.addActionListener(e -> cancelarCitaSeleccionada());
 
+        JButton btnReprogramar = new JButton("Reprogramar cita seleccionada");
+        btnReprogramar.setFont(Estilo.FUENTE);
+        btnReprogramar.addActionListener(e -> reprogramarCitaSeleccionada());
+
         JPanel filtros = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         filtros.setOpaque(false);
         filtros.add(etiqueta("Médico:"));
         filtros.add(cmbFiltroMedico);
+        filtros.add(btnReprogramar);
         filtros.add(btnCancelar);
 
         JPanel barra = new JPanel();
@@ -133,6 +150,7 @@ public class DashboardRecepcion extends DashboardBase {
         return barra;
     }
 
+    /** Pide al servidor todas las citas de la clínica del día seleccionado y las muestra. */
     private void cargarAgenda() {
         LocalDate dia = selectorDia.getDia();
         this.<List<CitaDTO>>pedirAlServidor(new PaqueteRed(Acciones.AGENDA_CLINICA, dia), lista -> {
@@ -159,17 +177,93 @@ public class DashboardRecepcion extends DashboardBase {
         }
     }
 
-    private void cancelarCitaSeleccionada() {
+    /** La cita elegida en la agenda, o null (con aviso) si no hay ninguna o no está PENDIENTE. */
+    /**
+     * @param accion verbo que se usa en el aviso ("cancelar", "reprogramar")
+     */
+    private CitaDTO citaPendienteSeleccionada(String accion) {
         int filaVista = agenda.getTabla().getSelectedRow();
         if (filaVista < 0) {
             info("Selecciona primero una cita de la agenda.");
-            return;
+            return null;
         }
         CitaDTO cita = citasVisibles.get(agenda.getTabla().convertRowIndexToModel(filaVista));
         if (!"PENDIENTE".equals(cita.getEstado())) {
-            info("Solo se pueden cancelar citas pendientes.");
+            info("Solo se pueden " + accion + " citas pendientes.");
+            return null;
+        }
+        return cita;
+    }
+
+    /**
+     * Reprogramar (RF2): se elige un nuevo día y una de las horas libres del mismo médico.
+     * El servidor vuelve a comprobar la franja y MySQL rechaza el hueco si alguien lo ha cogido antes.
+     */
+    private void reprogramarCitaSeleccionada() {
+        CitaDTO cita = citaPendienteSeleccionada("reprogramar");
+        if (cita == null) return;
+
+        // ---- Controles del diálogo: el día propuesto es el de la cita, o hoy si ya pasó ----
+        LocalDate diaInicial = cita.getFechaHora().toLocalDate().isBefore(LocalDate.now())
+                ? LocalDate.now() : cita.getFechaHora().toLocalDate();
+        JSpinner spnNuevaFecha = new JSpinner(new SpinnerDateModel());
+        spnNuevaFecha.setEditor(new JSpinner.DateEditor(spnNuevaFecha, "dd/MM/yyyy"));
+        spnNuevaFecha.setValue(Date.from(diaInicial.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        JComboBox<LocalTime> cmbNuevaHora = new JComboBox<>();
+        textoCombo(cmbNuevaHora, h -> h.format(HORA), "— sin horas libres —");
+        JLabel lblLibres = new JLabel(" ");
+        for (JComponent c : new JComponent[] {spnNuevaFecha, cmbNuevaHora, lblLibres}) {
+            c.setFont(Estilo.FUENTE);
+        }
+        lblLibres.setForeground(Estilo.TEXTO_SUAVE);
+
+        // Cada cambio de día vuelve a consultar las horas libres del mismo médico
+        Runnable recargar = () -> cargarHorasLibres(cita.getIdTrabajador(), aLocalDate(spnNuevaFecha),
+                cmbNuevaHora, lblLibres, () -> aLocalDate(spnNuevaFecha));
+        spnNuevaFecha.addChangeListener(e -> recargar.run());
+        recargar.run();
+
+        // ---- Formulario del diálogo: datos actuales y nueva fecha/hora ----
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        int fila = 0;
+        fila = filaFormulario(form, gbc, fila, "Paciente", new JLabel(cita.getNombrePaciente()));
+        fila = filaFormulario(form, gbc, fila, "Médico", new JLabel(cita.getNombreMedico()));
+        fila = filaFormulario(form, gbc, fila, "Cita actual",
+                new JLabel(cita.getFechaHora().format(FECHA) + " a las " + cita.getFechaHora().format(HORA)));
+        fila = filaFormulario(form, gbc, fila, "Nuevo día", spnNuevaFecha);
+        fila = filaFormulario(form, gbc, fila, "Nueva hora", cmbNuevaHora);
+        filaFormulario(form, gbc, fila, "", lblLibres);
+
+        // Se reutiliza un JOptionPane como diálogo modal con botones Aceptar/Cancelar
+        int ok = JOptionPane.showConfirmDialog(this, form, "Reprogramar cita",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (ok != JOptionPane.OK_OPTION) return;
+        LocalTime hora = (LocalTime) cmbNuevaHora.getSelectedItem();
+        if (hora == null) {
+            info("No se ha elegido ninguna hora libre. La cita no se ha cambiado.");
             return;
         }
+        LocalDateTime nueva = aLocalDate(spnNuevaFecha).atTime(hora);
+
+        this.<CitaDTO>pedirAlServidor(new PaqueteRed(Acciones.REPROGRAMAR_CITA, CitaDTO.reprogramada(cita.getId(), nueva)),
+                movida -> {
+                    info("Cita reprogramada: " + movida.getNombrePaciente() + " con " + movida.getNombreMedico()
+                            + " el " + movida.getFechaHora().format(FECHA) + " a las "
+                            + movida.getFechaHora().format(HORA) + ".");
+                    cargarAgenda();
+                    recargarHuecos();   // el hueco antiguo queda libre
+                },
+                this::cargarAgenda);   // si otra recepcionista cogió el hueco, se refresca la agenda
+    }
+
+    /** Cancela, tras pedir confirmación, la cita pendiente seleccionada en la agenda. */
+    private void cancelarCitaSeleccionada() {
+        CitaDTO cita = citaPendienteSeleccionada("cancelar");
+        if (cita == null) return;
         int ok = JOptionPane.showConfirmDialog(this,
                 "¿Cancelar la cita de " + cita.getNombrePaciente() + " a las " + cita.getFechaHora().format(HORA)
                 + " con " + cita.getNombreMedico() + "?",
@@ -184,6 +278,7 @@ public class DashboardRecepcion extends DashboardBase {
 
     // =================================================================== PACIENTES
 
+    /** Barra inferior de la sección de pacientes con los botones de alta, modificación y baja. */
     private JPanel crearBarraPacientes() {
         JButton btnNuevo = new JButton("Nuevo paciente");
         Estilo.botonAccion(btnNuevo);
@@ -205,6 +300,7 @@ public class DashboardRecepcion extends DashboardBase {
         return barra;
     }
 
+    /** Busca pacientes en el servidor con el texto del buscador y rellena la tabla (sin alergias, RN3). */
     private void buscarPacientes() {
         String texto = pacientes.getTxtBusqueda().getText().trim();
         this.<List<PacienteDTO>>pedirAlServidor(new PaqueteRed(Acciones.BUSCAR_PACIENTES, texto), lista -> {
@@ -223,6 +319,7 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
+    /** El paciente elegido en la tabla, o null (con aviso) si no hay ninguno seleccionado. */
     private PacienteDTO pacienteSeleccionado() {
         int filaVista = pacientes.getTabla().getSelectedRow();
         if (filaVista < 0) {
@@ -232,11 +329,13 @@ public class DashboardRecepcion extends DashboardBase {
         return pacientesVisibles.get(pacientes.getTabla().convertRowIndexToModel(filaVista));
     }
 
+    /** Abre el formulario vacío y, si se acepta, da de alta al paciente. */
     private void nuevoPaciente() {
         PacienteDTO datos = DialogoPaciente.mostrar(this, null);
         if (datos != null) guardarPaciente(datos, "Paciente dado de alta.");
     }
 
+    /** Abre el formulario con los datos del paciente seleccionado y guarda los cambios. */
     private void modificarPaciente() {
         PacienteDTO p = pacienteSeleccionado();
         if (p == null) return;
@@ -244,6 +343,12 @@ public class DashboardRecepcion extends DashboardBase {
         if (datos != null) guardarPaciente(datos, "Datos del paciente actualizados.");
     }
 
+    /**
+     * Envía el alta o la modificación al servidor y, si va bien, muestra el paciente guardado.
+     *
+     * @param datos     datos del formulario (id 0 = alta)
+     * @param mensajeOk mensaje de confirmación para el usuario
+     */
     private void guardarPaciente(PacienteDTO datos, String mensajeOk) {
         this.<PacienteDTO>pedirAlServidor(new PaqueteRed(Acciones.GUARDAR_PACIENTE, datos), guardado -> {
             info(mensajeOk);
@@ -252,6 +357,10 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
+    /**
+     * Da de baja, tras pedir confirmación, al paciente seleccionado. El servidor
+     * conserva su historial y cancela sus citas pendientes.
+     */
     private void bajaPaciente() {
         PacienteDTO p = pacienteSeleccionado();
         if (p == null) return;
@@ -262,14 +371,15 @@ public class DashboardRecepcion extends DashboardBase {
         if (ok != JOptionPane.YES_OPTION) return;
 
         this.<String>pedirAlServidor(new PaqueteRed(Acciones.BAJA_PACIENTE, p.getId()), mensaje -> {
-            info(mensaje);
+            info(mensaje);   // resumen enviado por el servidor (p. ej., citas canceladas)
             buscarPacientes();
-            cargarAgenda();
+            cargarAgenda();  // las citas canceladas cambian de estado en la agenda
         });
     }
 
     // =================================================================== REGISTRAR CITA
 
+    /** Construye la sección "Registrar cita": cabecera y formulario de alta de citas. */
     private JPanel crearPantallaCita() {
         JPanel pantalla = new JPanel(new BorderLayout(0, 16));
         pantalla.setBackground(Estilo.FONDO);
@@ -306,6 +416,7 @@ public class DashboardRecepcion extends DashboardBase {
         btnBuscar.addActionListener(e -> buscarPacientesCita());
         txtBuscarPacienteCita.addActionListener(e -> buscarPacientesCita());
 
+        // Al cambiar de médico o de día se recalculan las horas libres
         cmbMedico.addActionListener(e -> recargarHuecos());
         spnFecha.addChangeListener(e -> recargarHuecos());
 
@@ -350,6 +461,11 @@ public class DashboardRecepcion extends DashboardBase {
         return pantalla;
     }
 
+    /**
+     * Añade una fila al formulario: etiqueta en la columna 0 y campo en la columna 1.
+     *
+     * @return la siguiente fila libre del GridBagLayout
+     */
     private static int filaFormulario(JPanel form, GridBagConstraints gbc, int fila, String titulo, Component campo) {
         gbc.gridy = fila;
         gbc.gridx = 0;
@@ -361,6 +477,7 @@ public class DashboardRecepcion extends DashboardBase {
         return fila + 1;
     }
 
+    /** Carga los médicos en el filtro de la agenda y en el desplegable de "Registrar cita". */
     private void cargarMedicos() {
         this.<List<TrabajadorDTO>>pedirAlServidor(new PaqueteRed(Acciones.LISTAR_MEDICOS), lista -> {
             cmbFiltroMedico.removeAllItems();
@@ -375,6 +492,7 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
+    /** Busca pacientes para la nueva cita y los carga en el desplegable de paciente. */
     private void buscarPacientesCita() {
         String texto = txtBuscarPacienteCita.getText().trim();
         if (texto.isEmpty()) {
@@ -390,52 +508,73 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
+    /** Día seleccionado en el formulario de "Registrar cita". */
     private LocalDate fechaElegida() {
-        Date d = (Date) spnFecha.getValue();
+        return aLocalDate(spnFecha);
+    }
+
+    /** Convierte el {@link Date} de un JSpinner de fechas a {@link LocalDate} en la zona horaria local. */
+    private static LocalDate aLocalDate(JSpinner spinner) {
+        Date d = (Date) spinner.getValue();
         return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
-    /**
-     * Rellena el desplegable de horas con las franjas libres del médico ese día.
-     * Pide la agenda del día al servidor y quita las horas ocupadas (las canceladas no ocupan).
-     */
+    /** Rellena las horas libres del médico elegido en "Registrar cita". */
     private void recargarHuecos() {
         TrabajadorDTO medico = (TrabajadorDTO) cmbMedico.getSelectedItem();
-        LocalDate dia = fechaElegida();
-        cmbHora.removeAllItems();
         if (medico == null) {
+            cmbHora.removeAllItems();
             lblHuecos.setText(" ");
             return;
         }
+        // La respuesta solo es válida si, al llegar, sigue elegido el mismo médico
+        cargarHorasLibres(medico.getId(), fechaElegida(), cmbHora, lblHuecos,
+                () -> cmbMedico.getSelectedItem() == medico ? fechaElegida() : null);
+    }
+
+    /**
+     * Rellena 'combo' con las franjas de 15 minutos libres de un médico en un día.
+     * Pide la agenda del día al servidor y quita las horas ocupadas (las canceladas no ocupan).
+     * 'diaVigente' devuelve el día que se está mirando ahora: si ha cambiado cuando llega la respuesta,
+     * esa respuesta ya no sirve y se descarta.
+     */
+    private void cargarHorasLibres(int idMedico, LocalDate dia, JComboBox<LocalTime> combo, JLabel lbl,
+            Supplier<LocalDate> diaVigente) {
+        combo.removeAllItems();
         if (dia.isBefore(LocalDate.now())) {
-            lblHuecos.setText("No se pueden dar citas en días pasados.");
+            lbl.setText("No se pueden dar citas en días pasados.");
             return;
         }
-        lblHuecos.setText("Consultando horas libres…");
+        lbl.setText("Consultando horas libres…");
 
         this.<List<CitaDTO>>pedirAlServidor(new PaqueteRed(Acciones.AGENDA_CLINICA, dia), lista -> {
-            // Si mientras tanto se ha cambiado de médico o de día, esta respuesta ya no sirve
-            if (cmbMedico.getSelectedItem() != medico || !fechaElegida().equals(dia)) return;
+            if (!dia.equals(diaVigente.get())) return;   // respuesta obsoleta: el usuario ya cambió
 
+            // Horas ya ocupadas por citas no canceladas de ese médico
             Set<LocalTime> ocupadas = new HashSet<>();
             for (CitaDTO c : lista) {
-                if (c.getIdTrabajador() == medico.getId() && !"CANCELADA".equals(c.getEstado())) {
+                if (c.getIdTrabajador() == idMedico && !"CANCELADA".equals(c.getEstado())) {
                     ocupadas.add(c.getFechaHora().toLocalTime());
                 }
             }
             LocalDateTime ahora = LocalDateTime.now();
-            cmbHora.removeAllItems();
+            combo.removeAllItems();
+            // Se recorren todas las franjas del horario y se ofrecen las libres que aún no han pasado
             for (LocalTime h = APERTURA; h.isBefore(CIERRE); h = h.plusMinutes(15)) {
                 if (!ocupadas.contains(h) && dia.atTime(h).isAfter(ahora)) {
-                    cmbHora.addItem(h);
+                    combo.addItem(h);
                 }
             }
-            lblHuecos.setText(cmbHora.getItemCount() == 0
+            lbl.setText(combo.getItemCount() == 0
                     ? "El médico no tiene horas libres ese día."
-                    : cmbHora.getItemCount() + " horas libres.");
+                    : combo.getItemCount() + " horas libres.");
         });
     }
 
+    /**
+     * Valida el formulario y envía la nueva cita al servidor, que vuelve a comprobar
+     * que la franja sigue libre antes de guardarla.
+     */
     private void registrarCita() {
         PacienteDTO paciente = (PacienteDTO) cmbPaciente.getSelectedItem();
         TrabajadorDTO medico = (TrabajadorDTO) cmbMedico.getSelectedItem();
@@ -455,8 +594,8 @@ public class DashboardRecepcion extends DashboardBase {
                             + " el " + creada.getFechaHora().format(FECHA) + " a las "
                             + creada.getFechaHora().format(HORA) + ".");
                     txtMotivo.setText("");
-                    recargarHuecos();
-                    if (selectorDia.getDia().equals(dia)) cargarAgenda();
+                    recargarHuecos();   // la hora recién asignada deja de estar libre
+                    if (selectorDia.getDia().equals(dia)) cargarAgenda();   // solo si la agenda muestra ese día
                 },
                 () -> {
                     btnRegistrarCita.setEnabled(true);
@@ -481,6 +620,7 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
+    /** Etiqueta en negrita con el estilo común de los formularios. */
     private static JLabel etiqueta(String texto) {
         JLabel l = new JLabel(texto);
         l.setFont(Estilo.FUENTE_NEGRITA);
@@ -488,6 +628,7 @@ public class DashboardRecepcion extends DashboardBase {
         return l;
     }
 
+    /** Campo de texto con el estilo común de los formularios. */
     private static JTextField campoTexto() {
         JTextField t = new JTextField();
         t.setFont(Estilo.FUENTE);
@@ -495,6 +636,7 @@ public class DashboardRecepcion extends DashboardBase {
         return t;
     }
 
+    /** Muestra un mensaje informativo al usuario. */
     private void info(String mensaje) {
         JOptionPane.showMessageDialog(this, mensaje, "MedManager", JOptionPane.INFORMATION_MESSAGE);
     }

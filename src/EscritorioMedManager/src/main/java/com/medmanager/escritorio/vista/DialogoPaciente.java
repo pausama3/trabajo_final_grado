@@ -30,8 +30,10 @@ import com.medmanager.comun.PacienteDTO;
 public class DialogoPaciente extends JDialog {
     private static final long serialVersionUID = 1L;
 
+    /** Formato de fecha que se muestra y se acepta en el formulario. */
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    // ---- Campos del formulario ----
     private final JTextField txtDni = campo();
     private final JTextField txtNombre = campo();
     private final JTextField txtApellidos = campo();
@@ -43,12 +45,20 @@ public class DialogoPaciente extends JDialog {
     private final int idPaciente;    // 0 = alta
     private PacienteDTO resultado;   // se rellena al pulsar Guardar
 
+    /**
+     * Muestra el formulario de forma modal y espera a que el usuario lo cierre.
+     *
+     * @param padre    ventana sobre la que se centra el diálogo
+     * @param paciente paciente a modificar, o {@code null} para un alta nueva
+     * @return los datos introducidos, o {@code null} si el usuario canceló
+     */
     public static PacienteDTO mostrar(Window padre, PacienteDTO paciente) {
         DialogoPaciente d = new DialogoPaciente(padre, paciente);
         d.setVisible(true);   // modal: se queda aquí hasta que se cierra
         return d.resultado;
     }
 
+    /** Constructor privado: el diálogo se abre siempre con {@link #mostrar(Window, PacienteDTO)}. */
     private DialogoPaciente(Window padre, PacienteDTO p) {
         super(padre, p == null ? "Nuevo paciente" : "Modificar paciente", ModalityType.APPLICATION_MODAL);
         idPaciente = p == null ? 0 : p.getId();
@@ -56,6 +66,7 @@ public class DialogoPaciente extends JDialog {
         setLocationRelativeTo(padre);
         setLayout(new BorderLayout());
 
+        // ---- Formulario: una etiqueta encima de cada campo ----
         JPanel form = new JPanel(new GridBagLayout());
         form.setBackground(Estilo.FONDO);
         form.setBorder(new EmptyBorder(20, 24, 10, 24));
@@ -74,6 +85,7 @@ public class DialogoPaciente extends JDialog {
         fila = anadir(form, gbc, fila, "Dirección", txtDireccion);
         anadir(form, gbc, fila, "Fecha de nacimiento (dd/mm/aaaa)", txtFechaNac);
 
+        // En modo modificación se precargan los datos actuales
         if (p != null) {
             txtDni.setText(p.getDni());
             txtNombre.setText(p.getNombre());
@@ -84,11 +96,12 @@ public class DialogoPaciente extends JDialog {
             txtFechaNac.setText(p.getFechaNacimiento() != null ? p.getFechaNacimiento().format(FECHA) : "");
         }
 
+        // ---- Pie con los botones ----
         JPanel pie = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
         pie.setBackground(Estilo.BLANCO);
         JButton btnCancelar = new JButton("Cancelar");
         btnCancelar.setFont(Estilo.FUENTE);
-        btnCancelar.addActionListener(e -> dispose());
+        btnCancelar.addActionListener(e -> dispose());   // resultado queda a null
         JButton btnGuardar = new JButton("Guardar");
         Estilo.botonAccion(btnGuardar);
         btnGuardar.addActionListener(e -> guardar());
@@ -106,6 +119,7 @@ public class DialogoPaciente extends JDialog {
             aviso("DNI, nombre y apellidos son obligatorios.");
             return;
         }
+        // La fecha de nacimiento es opcional, pero si se escribe debe ser válida
         LocalDate fechaNac = null;
         if (!txtFechaNac.getText().isBlank()) {
             try {
@@ -115,6 +129,7 @@ public class DialogoPaciente extends JDialog {
                 return;
             }
         }
+        // El DNI se normaliza en mayúsculas; las alergias van a null porque recepción no las gestiona
         resultado = new PacienteDTO(idPaciente,
                 txtDni.getText().trim().toUpperCase(), txtNombre.getText().trim(), txtApellidos.getText().trim(),
                 txtTelefono.getText().trim(), txtEmail.getText().trim(), txtDireccion.getText().trim(),
@@ -122,10 +137,16 @@ public class DialogoPaciente extends JDialog {
         dispose();
     }
 
+    /** Muestra un aviso de validación sin cerrar el formulario. */
     private void aviso(String mensaje) {
         JOptionPane.showMessageDialog(this, mensaje, "Revisa los datos", JOptionPane.WARNING_MESSAGE);
     }
 
+    /**
+     * Añade al formulario una etiqueta y, debajo, su campo de texto.
+     *
+     * @return la siguiente fila libre del GridBagLayout
+     */
     private static int anadir(JPanel form, GridBagConstraints gbc, int fila, String titulo, JTextField campo) {
         JLabel lbl = new JLabel(titulo);
         lbl.setFont(Estilo.FUENTE_NEGRITA);
@@ -136,6 +157,7 @@ public class DialogoPaciente extends JDialog {
         return fila + 2;
     }
 
+    /** Crea un campo de texto con el estilo común de la aplicación. */
     private static JTextField campo() {
         JTextField t = new JTextField();
         t.setFont(Estilo.FUENTE);
@@ -143,6 +165,7 @@ public class DialogoPaciente extends JDialog {
         return t;
     }
 
+    /** Convierte {@code null} en cadena vacía para poder mostrarlo en un campo de texto. */
     private static String nulo(String s) {
         return s == null ? "" : s;
     }

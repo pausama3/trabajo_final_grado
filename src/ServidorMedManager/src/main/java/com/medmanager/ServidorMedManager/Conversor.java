@@ -9,10 +9,21 @@ import com.medmanager.comun.HistorialDTO;
 import com.medmanager.comun.PacienteDTO;
 import com.medmanager.comun.TrabajadorDTO;
 
-/** Pasa de entidades de Hibernate a DTO. Aquí se decide qué campos salen del servidor. */
+/**
+ * Pasa de entidades de Hibernate a DTO. Aquí se decide qué campos salen del servidor.
+ * <p>
+ * Las entidades nunca se envían directamente al cliente: así se evitan problemas
+ * de carga perezosa fuera de la sesión de Hibernate y se aplica en un único
+ * punto la regla de confidencialidad RN3.
+ */
 public final class Conversor {
-    private Conversor() { }
+    private Conversor() { }   // clase de utilidades: no se instancia
 
+    /**
+     * @param p           paciente a convertir
+     * @param conAlergias {@code true} si el rol del usuario puede ver las alergias
+     * @return DTO del paciente
+     */
     public static PacienteDTO aDTO(Paciente p, boolean conAlergias) {
         return new PacienteDTO(
                 p.getId_paciente(), p.getDni(), p.getNombre(), p.getApellidos(),
@@ -22,8 +33,10 @@ public final class Conversor {
     }
 
     /**
+     * @param c             cita a convertir
      * @param datosClinicos true para médico/enfermería; false para recepción, que según RN3
      *                      no puede ver ni las alergias ni las observaciones de enfermería
+     * @return DTO de la cita con los nombres de paciente y médico ya resueltos
      */
     public static CitaDTO aDTO(Cita c, boolean datosClinicos) {
         Paciente p = c.getPaciente();
@@ -36,6 +49,10 @@ public final class Conversor {
                 datosClinicos ? c.getObservaciones() : null);   // RN3
     }
 
+    /**
+     * @param h entrada de historial a convertir
+     * @return DTO del informe; el médico es el que atendió la cita asociada
+     */
     public static HistorialDTO aDTO(Historial_Medico h) {
         Paciente p = h.getPaciente();
         Trabajador medico = h.getCita().getTrabajador();
@@ -52,6 +69,7 @@ public final class Conversor {
                 t.getEspecialidad() != null ? t.getEspecialidad().getNombre_especialidad() : null);
     }
 
+    /** Nombre y apellidos del paciente en una sola cadena. */
     private static String nombreCompleto(Paciente p) {
         return p.getNombre() + " " + p.getApellidos();
     }

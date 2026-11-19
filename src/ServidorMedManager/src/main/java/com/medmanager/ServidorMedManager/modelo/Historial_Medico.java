@@ -3,6 +3,12 @@ package com.medmanager.ServidorMedManager.modelo;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * Entidad JPA que representa una entrada del historial médico (tabla {@code historial_medico}).
+ * <p>
+ * Cada entrada es el informe que redacta el médico al cerrar una cita, por lo
+ * que la relación con {@link Cita} es uno a uno: una cita tiene como máximo un informe.
+ */
 @Entity // indica que es una entidad de la BD
 @Table(name = "historial_medico") // el nombre exacto de la tabla en la BD
 public class Historial_Medico {
@@ -12,11 +18,11 @@ public class Historial_Medico {
 	@Column(name = "id_historial")
 	private int id_historial;
 
-	@ManyToOne
+	@ManyToOne   // un paciente acumula muchos informes a lo largo del tiempo
 	@JoinColumn(name = "id_paciente", nullable = false)
 	private Paciente paciente;
 
-	@OneToOne
+	@OneToOne   // un informe por cita (restricción UNIQUE en la BD)
 	@JoinColumn(name = "id_cita", nullable = false, unique = true)
 	private Cita cita;
 
@@ -33,12 +39,15 @@ public class Historial_Medico {
 	private LocalDateTime fecha_registro = LocalDateTime.now();
 	
 	@Column(name = "activo", nullable = false)
-	private boolean activo = true;
+	private boolean activo = true;   // borrado lógico: el historial nunca se elimina físicamente
 
 	// Constructores
+
+	/** Constructor vacío exigido por JPA. */
 	public Historial_Medico() {
 	}
 
+	/** Crea un informe con fecha de registro igual al momento actual. */
 	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento, boolean activo) {
 		this.paciente = paciente;
 		this.cita = cita;
@@ -48,6 +57,7 @@ public class Historial_Medico {
 		this.activo = activo;
 	}
 
+	/** Crea un informe con una fecha de registro concreta (p. ej., para cargar datos históricos). */
 	public Historial_Medico(Paciente paciente, Cita cita, String diagnostico, String tratamiento, LocalDateTime fecha_registro,  boolean activo) {
 		this.paciente = paciente;
 		this.cita = cita;

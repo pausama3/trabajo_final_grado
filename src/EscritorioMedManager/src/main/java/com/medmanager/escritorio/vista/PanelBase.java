@@ -14,20 +14,32 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableModel;
 
-/** Pantalla con título, buscador opcional y una tabla. Sirve de base para varias secciones. */
+/**
+ * Pantalla con título, buscador opcional y una tabla. Sirve de base para varias secciones.
+ * <p>
+ * Solo construye la interfaz: la carga de datos y la respuesta a los botones
+ * las añade quien la utiliza, a través de los getters.
+ */
 public class PanelBase extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private final DefaultTableModel modelo;
     private final JTable tabla;
-    private JTextField txtBusqueda;
-    private JButton btnBuscar;
+    private JTextField txtBusqueda;   // null si el panel se creó sin buscador
+    private JButton btnBuscar;        // null si el panel se creó sin buscador
 
+    /**
+     * @param titulo      título grande de la sección
+     * @param subtitulo   texto descriptivo bajo el título
+     * @param columnas    cabeceras de la tabla
+     * @param conBuscador si se muestra la barra de búsqueda
+     */
     public PanelBase(String titulo, String subtitulo, String[] columnas, boolean conBuscador) {
         setLayout(new BorderLayout(0, 16));
         setBackground(Estilo.FONDO);
         setBorder(new EmptyBorder(24, 28, 24, 28));
 
+        // ---- Cabecera: título, subtítulo y, opcionalmente, buscador ----
         JPanel cabecera = new JPanel(new BorderLayout(0, 14));
         cabecera.setOpaque(false);
 
@@ -58,6 +70,7 @@ public class PanelBase extends JPanel {
         }
         add(cabecera, BorderLayout.NORTH);
 
+        // ---- Tabla de resultados (de solo lectura) ----
         modelo = new DefaultTableModel(columnas, 0) {
             private static final long serialVersionUID = 1L;
             @Override public boolean isCellEditable(int fila, int col) { return false; }
@@ -71,6 +84,7 @@ public class PanelBase extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
+    // Getters para que cada sección conecte sus datos y eventos
     public DefaultTableModel getModelo()   { return modelo; }
     public JTable getTabla()               { return tabla; }
     public JTextField getTxtBusqueda()     { return txtBusqueda; }

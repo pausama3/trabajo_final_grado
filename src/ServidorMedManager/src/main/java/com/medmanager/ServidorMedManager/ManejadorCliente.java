@@ -28,19 +28,35 @@ import com.medmanager.comun.PacienteDTO;
 import com.medmanager.comun.PaqueteRed;
 import com.medmanager.comun.TrabajadorDTO;
 
+/**
+ * Atiende a un cliente conectado durante toda la vida de su conexión.
+ * <p>
+ * Se ejecuta en un hilo propio. Lee peticiones {@link PaqueteRed} de forma
+ * secuencial, comprueba la sesión y los permisos del usuario, delega la
+ * operación en el DAO correspondiente y responde con {@link Acciones#OK} o
+ * {@link Acciones#ERROR}. Los errores de una petición no cierran la conexión.
+ */
 public class ManejadorCliente implements Runnable {
 
     private final Socket socket;
+    // Cada hilo tiene sus propios DAO (no guardan estado, solo abren sesiones de Hibernate)
     private final TrabajadorDAO trabajadorDAO = new TrabajadorDAO();
     private final PacienteDAO pacienteDAO = new PacienteDAO();
     private final CitaDAO citaDAO = new CitaDAO();
     private final HistorialMedicoDAO historialDAO = new HistorialMedicoDAO();
     private Trabajador sesion;   // null = nadie ha iniciado sesión en esta conexión
 
+    /**
+     * @param socket conexión ya aceptada con el cliente
+     */
     public ManejadorCliente(Socket socket) {
         this.socket = socket;
     }
 
+    /**
+     * Bucle principal de la conexión: lee, valida, procesa y responde peticiones
+     * hasta que el cliente se desconecta.
+     */
     @Override
     public void run() {
         try (
@@ -50,8 +66,9 @@ public class ManejadorCliente implements Runnable {
             out.flush();   // envía la cabecera para que el cliente pueda abrir su ObjectInputStream
 
             while (true) {   // una conexión, muchas peticiones
-                Object recibido = in.readObject();
+                Object recibido = in.readObject();   // bloquea hasta la siguiente petición
 
+                // Se descarta cualquier objeto que no siga el protocolo
                 if (!(recibido instanceof PaqueteRed)) {
                     responder(out, Acciones.ERROR, "Mensaje no válido");
                     continue;
@@ -75,6 +92,7 @@ public class ManejadorCliente implements Runnable {
                 }
                 // --------------------------------------------------------------------
 
+                // Despacho de la acción a su método correspondiente
                 try {
                     switch (accion) {
                         case Acciones.LOGIN:
@@ -104,6 +122,9 @@ public class ManejadorCliente implements Runnable {
                         case Acciones.CANCELAR_CITA:
                             cancelarCita(paquete, out);
                             break;
+                        case Acciones.REPROGRAMAR_CITA:
+                            reprogramarCita(paquete, out);
+                            break;
                         case Acciones.GUARDAR_PACIENTE:
                             guardarPaciente(paquete, out);
                             break;
@@ -124,6 +145,7 @@ public class ManejadorCliente implements Runnable {
             }
 
         } catch (EOFException e) {
+            // Fin de flujo: el cliente ha cerrado la conexión de forma normal
             System.out.println("Cliente desconectado.");
         } catch (Exception e) {
             System.err.println("Error en la comunicación con el cliente: " + e.getMessage());
@@ -137,6 +159,12 @@ public class ManejadorCliente implements Runnable {
         }
     }
 
+    // ---------------------------------------------------------------- Sesión
+
+    /**
+     * Valida las credenciales y, si son correctas, asocia el trabajador a esta conexión.
+     * Un login fallido anula cualquier sesión previa.
+     */
     private void procesarLogin(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         if (!(paquete.getPayload() instanceof LoginDTO)) {
             responder(out, Acciones.ERROR, "Datos de login no válidos");
@@ -161,6 +189,7 @@ public class ManejadorCliente implements Runnable {
 
     // ---------------------------------------------------------------- Pacientes
 
+    /** Busca pacientes activos; las alergias solo se incluyen para el personal sanitario. */
     private void buscarPacientes(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         String texto = paquete.getPayload() instanceof String ? ((String) paquete.getPayload()).trim() : "";
         boolean conAlergias = sesion.getRol() != Rol.RECEPCIONISTA;   // RN3
@@ -195,6 +224,10 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, resultado);
     }
 
+    /**
+     * Registra el informe de una consulta. El médico se toma de la sesión, no del
+     * cliente, para que nadie pueda cerrar citas de otro médico.
+     */
     private void guardarInforme(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         if (!(paquete.getPayload() instanceof InformeDTO)) {
             responder(out, Acciones.ERROR, "Datos del informe no válidos");
@@ -215,6 +248,7 @@ public class ManejadorCliente implements Runnable {
 
     // ---------------------------------------------------------------- Recepción
 
+    /** Agenda de todos los médicos para un día (hoy si no se indica). */
     private void agendaClinica(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         LocalDate dia = paquete.getPayload() instanceof LocalDate ? (LocalDate) paquete.getPayload() : LocalDate.now();
         ArrayList<CitaDTO> resultado = new ArrayList<>();
@@ -224,6 +258,7 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, resultado);
     }
 
+    /** Médicos con su especialidad, para elegir a quién se asigna una cita. */
     private void listarMedicos(ObjectOutputStream out) throws IOException {
         ArrayList<TrabajadorDTO> resultado = new ArrayList<>();
         for (Trabajador t : trabajadorDAO.listarMedicos()) {
@@ -232,6 +267,7 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, resultado);
     }
 
+    /** Valida los datos de la nueva cita y la registra como PENDIENTE. */
     private void crearCita(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         if (!(paquete.getPayload() instanceof CitaDTO)) {
             responder(out, Acciones.ERROR, "Datos de la cita no válidos");
@@ -239,15 +275,7 @@ public class ManejadorCliente implements Runnable {
         }
         CitaDTO dto = (CitaDTO) paquete.getPayload();
         LocalDateTime fh = dto.getFechaHora();
-        if (fh == null) {
-            throw new IllegalArgumentException("Falta la fecha y hora de la cita");
-        }
-        if (fh.getMinute() % 15 != 0 || fh.getSecond() != 0 || fh.getNano() != 0) {
-            throw new IllegalArgumentException("Las citas van en franjas de 15 minutos (:00, :15, :30, :45)");
-        }
-        if (fh.isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("No se puede dar una cita en una fecha u hora ya pasada");
-        }
+        comprobarFechaHora(fh);
         String motivo = vacioANull(dto.getMotivoConsulta());
         if (motivo != null && motivo.length() > 255) {
             throw new IllegalArgumentException("El motivo no puede superar 255 caracteres");
@@ -257,6 +285,7 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, Conversor.aDTO(cita, false));
     }
 
+    /** Cancela una cita pendiente a partir de su id. */
     private void cancelarCita(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         if (!(paquete.getPayload() instanceof Integer)) {
             responder(out, Acciones.ERROR, "Cita no válida");
@@ -265,6 +294,33 @@ public class ManejadorCliente implements Runnable {
         Cita cita = citaDAO.cancelar((Integer) paquete.getPayload());
         System.out.println("🚫 Cita " + cita.getId_cita() + " cancelada por " + sesion.getUsuario());
         responder(out, Acciones.OK, Conversor.aDTO(cita, false));
+    }
+
+    /** Mueve una cita PENDIENTE a otra fecha/hora con el mismo médico (RF2, RN5). */
+    private void reprogramarCita(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof CitaDTO)) {
+            responder(out, Acciones.ERROR, "Datos de la cita no válidos");
+            return;
+        }
+        CitaDTO dto = (CitaDTO) paquete.getPayload();
+        comprobarFechaHora(dto.getFechaHora());
+        Cita cita = citaDAO.reprogramar(dto.getId(), dto.getFechaHora());
+        System.out.println("🔁 Cita " + cita.getId_cita() + " reprogramada a " + cita.getFecha_hora()
+                + " por " + sesion.getUsuario());
+        responder(out, Acciones.OK, Conversor.aDTO(cita, false));
+    }
+
+    /** Reglas de la fecha/hora de una cita: franja de 15 minutos (RN1) y nunca en el pasado. */
+    private static void comprobarFechaHora(LocalDateTime fh) {
+        if (fh == null) {
+            throw new IllegalArgumentException("Falta la fecha y hora de la cita");
+        }
+        if (fh.getMinute() % 15 != 0 || fh.getSecond() != 0 || fh.getNano() != 0) {
+            throw new IllegalArgumentException("Las citas van en franjas de 15 minutos (:00, :15, :30, :45)");
+        }
+        if (fh.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("No se puede dar una cita en una fecha u hora ya pasada");
+        }
     }
 
     /** Alta (id 0) o modificación de los datos personales. Las alergias nunca se tocan desde aquí (RN3). */
@@ -281,6 +337,8 @@ public class ManejadorCliente implements Runnable {
         String email = vacioANull(dto.getEmail());
         String direccion = vacioANull(dto.getDireccion());
 
+        // ---- Validaciones: el servidor no se fía de lo que haya comprobado el cliente ----
+        // DNI: 8 dígitos + letra; NIE: X/Y/Z + 7 dígitos + letra
         if (dni == null || !dni.toUpperCase().matches("\\d{8}[A-Z]|[XYZ]\\d{7}[A-Z]")) {
             throw new IllegalArgumentException("El DNI/NIE no es válido (ej.: 12345678A o X1234567B)");
         }
@@ -290,6 +348,7 @@ public class ManejadorCliente implements Runnable {
         comprobarTexto(telefono, "teléfono", 15, false);
         comprobarTexto(email, "email", 100, false);
         comprobarTexto(direccion, "dirección", 255, false);
+        // Formato básico de email: algo@dominio.ext
         if (email != null && !email.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
             throw new IllegalArgumentException("El email no es válido");
         }
@@ -298,12 +357,12 @@ public class ManejadorCliente implements Runnable {
         }
 
         Paciente guardado;
-        if (dto.getId() == 0) {
+        if (dto.getId() == 0) {   // alta: el paciente se crea activo y sin alergias registradas
             guardado = new Paciente(dni, dto.getFechaNacimiento(), nombre, apellidos, telefono,
                     email, direccion, null, true);
             pacienteDAO.save(guardado);
             System.out.println("➕ Paciente " + dni + " dado de alta por " + sesion.getUsuario());
-        } else {
+        } else {   // modificación de un paciente existente
             guardado = pacienteDAO.modificarDatos(dto.getId(), dni, nombre, apellidos, telefono,
                     email, direccion, dto.getFechaNacimiento());
             System.out.println("✏️ Paciente " + dni + " modificado por " + sesion.getUsuario());
@@ -311,6 +370,7 @@ public class ManejadorCliente implements Runnable {
         responder(out, Acciones.OK, Conversor.aDTO(guardado, false));
     }
 
+    /** Baja lógica de un paciente; responde con un resumen que incluye las citas canceladas. */
     private void bajaPaciente(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
         if (!(paquete.getPayload() instanceof Integer)) {
             responder(out, Acciones.ERROR, "Paciente no válido");
@@ -323,6 +383,13 @@ public class ManejadorCliente implements Runnable {
                 : "Paciente dado de baja. Se han cancelado " + canceladas + " cita(s) pendiente(s).");
     }
 
+    // ---------------------------------------------------------------- Utilidades
+
+    /**
+     * Comprueba la obligatoriedad y la longitud máxima de un campo de texto.
+     *
+     * @throws IllegalArgumentException con un mensaje para el usuario si no es válido
+     */
     private static void comprobarTexto(String valor, String campo, int max, boolean obligatorio) {
         if (valor == null) {
             if (obligatorio) throw new IllegalArgumentException("El campo " + campo + " es obligatorio");
@@ -333,10 +400,12 @@ public class ManejadorCliente implements Runnable {
         }
     }
 
+    /** Recorta espacios y convierte las cadenas vacías en {@code null} (así se guardan en la BD). */
     private static String vacioANull(String s) {
         return (s == null || s.trim().isEmpty()) ? null : s.trim();
     }
 
+    /** Envía una respuesta al cliente y vacía el búfer para que llegue de inmediato. */
     private void responder(ObjectOutputStream out, String accion, Object payload) throws IOException {
         out.writeObject(new PaqueteRed(accion, payload));
         out.flush();

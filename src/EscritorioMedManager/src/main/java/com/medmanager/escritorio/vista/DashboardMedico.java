@@ -34,11 +34,19 @@ import com.medmanager.comun.PacienteDTO;
 import com.medmanager.comun.PaqueteRed;
 import com.medmanager.comun.TrabajadorDTO;
 
-/** Pantalla principal del médico: su agenda, sus pacientes y los informes. Todo viene del servidor. */
+/**
+ * Pantalla principal del médico: su agenda, sus pacientes y los informes. Todo viene del servidor.
+ * <p>
+ * Desde la agenda el médico puede registrar la consulta de una cita pendiente;
+ * al guardar el informe, el servidor marca la cita como realizada.
+ */
 public class DashboardMedico extends DashboardBase {
     private static final long serialVersionUID = 1L;
 
+    /** Índice de la columna "Acción" de la tabla de agenda. */
     private static final int COL_ACCION = 5;
+
+    // ---- Formatos de fecha y hora para mostrar en las tablas ----
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -51,6 +59,11 @@ public class DashboardMedico extends DashboardBase {
     private List<CitaDTO> citasAgenda = new ArrayList<>();
     private final SelectorDia selectorDia;
 
+    /**
+     * Construye las tres secciones del médico y lanza la carga inicial de datos.
+     *
+     * @param usuario médico que ha iniciado sesión
+     */
     public DashboardMedico(TrabajadorDTO usuario) {
         super(usuario, "Médico");
 
@@ -83,10 +96,11 @@ public class DashboardMedico extends DashboardBase {
 
     // =================================================================== AGENDA
 
+    /** Pide al servidor las citas del médico para el día seleccionado y rellena la tabla. */
     private void cargarAgenda() {
         this.<List<CitaDTO>>pedirAlServidor(new PaqueteRed(Acciones.AGENDA_MEDICO, selectorDia.getDia()), lista -> {
-            citasAgenda = lista;
-            agenda.getModelo().setRowCount(0);
+            citasAgenda = lista;   // se guarda para saber qué cita corresponde a cada fila
+            agenda.getModelo().setRowCount(0);   // se vacía la tabla antes de volver a llenarla
             for (CitaDTO c : lista) {
                 agenda.getModelo().addRow(new Object[] {
                     c.getFechaHora().format(HORA),
@@ -100,6 +114,10 @@ public class DashboardMedico extends DashboardBase {
         });
     }
 
+    /**
+     * Texto de la columna "Acción" según el estado de la cita.
+     * El renderizador convierte "registrar" en un botón.
+     */
     private static String textoAccion(String estado) {
         switch (estado) {
             case "PENDIENTE": return "registrar";
@@ -112,8 +130,9 @@ public class DashboardMedico extends DashboardBase {
     private void configurarColumnaAccion() {
         JTable tabla = agenda.getTabla();
         Color filaPar = Estilo.BLANCO;
-        Color filaImpar = new Color(0xF7F9FC);
+        Color filaImpar = new Color(0xF7F9FC);   // mismos colores alternos que Estilo.estilizarTabla
 
+        // El botón solo se dibuja: los clics se detectan con el MouseListener de la tabla
         tabla.getColumnModel().getColumn(COL_ACCION).setCellRenderer(new DefaultTableCellRenderer() {
             private static final long serialVersionUID = 1L;
 
@@ -134,6 +153,7 @@ public class DashboardMedico extends DashboardBase {
                     return contenedor;
                 }
 
+                // Resto de estados: texto gris centrado
                 JLabel lbl = (JLabel) super.getTableCellRendererComponent(t, texto, sel, false, fila, col);
                 lbl.setForeground(Estilo.TEXTO_SUAVE);
                 lbl.setHorizontalAlignment(SwingConstants.CENTER);
@@ -147,11 +167,12 @@ public class DashboardMedico extends DashboardBase {
             public void mouseClicked(MouseEvent e) {
                 int filaVista = tabla.rowAtPoint(e.getPoint());
                 int col = tabla.columnAtPoint(e.getPoint());
-                if (filaVista < 0 || col != COL_ACCION) return;
+                if (filaVista < 0 || col != COL_ACCION) return;   // clic fuera de la columna "Acción"
 
+                // Se traduce la fila visible a la del modelo por si la tabla estuviese ordenada
                 int fila = tabla.convertRowIndexToModel(filaVista);
                 CitaDTO cita = citasAgenda.get(fila);
-                if ("PENDIENTE".equals(cita.getEstado())) {
+                if ("PENDIENTE".equals(cita.getEstado())) {   // solo las pendientes admiten informe
                     abrirDialogoInforme(cita);
                 }
             }
@@ -160,6 +181,7 @@ public class DashboardMedico extends DashboardBase {
 
     /** Ventana para redactar el informe. Al guardar, el servidor cierra la cita (REALIZADA). */
     private void abrirDialogoInforme(CitaDTO cita) {
+        // Diálogo modal: bloquea el panel principal mientras se redacta el informe
         JDialog dialogo = new JDialog(this, "Registrar consulta — " + cita.getNombrePaciente(), true);
         dialogo.setSize(520, 640);
         dialogo.setLocationRelativeTo(this);
@@ -202,6 +224,7 @@ public class DashboardMedico extends DashboardBase {
         JButton btnGuardar = new JButton("Guardar");
         Estilo.botonAccion(btnGuardar);
         btnGuardar.addActionListener(e -> {
+            // El diagnóstico es el único campo obligatorio para cerrar la consulta
             String diag = txtDiagnostico.getText().trim();
             if (diag.isEmpty()) {
                 JOptionPane.showMessageDialog(dialogo,
@@ -221,7 +244,7 @@ public class DashboardMedico extends DashboardBase {
                             buscarInformes();   // si había una búsqueda abierta, se actualiza
                         }
                     },
-                    () -> btnGuardar.setEnabled(true));
+                    () -> btnGuardar.setEnabled(true));   // si falla, se permite reintentar
         });
 
         pie.add(btnCancelar);
@@ -241,6 +264,7 @@ public class DashboardMedico extends DashboardBase {
         gbc.weighty = 0;
         form.add(lbl, gbc);
 
+        // 'peso' reparte el alto sobrante del diálogo entre los cuadros de texto
         JTextArea area = new JTextArea(3, 20);
         area.setFont(Estilo.FUENTE);
         area.setLineWrap(true);
@@ -256,6 +280,10 @@ public class DashboardMedico extends DashboardBase {
 
     // =================================================================== PACIENTES
 
+    /**
+     * Busca pacientes en el servidor con el texto del buscador y rellena la tabla.
+     * Con el buscador vacío se listan todos (el servidor limita a 50). El médico sí ve las alergias.
+     */
     private void buscarPacientes() {
         String texto = pacientes.getTxtBusqueda().getText().trim();
         this.<List<PacienteDTO>>pedirAlServidor(new PaqueteRed(Acciones.BUSCAR_PACIENTES, texto), lista -> {
@@ -274,6 +302,10 @@ public class DashboardMedico extends DashboardBase {
 
     // =================================================================== INFORMES
 
+    /**
+     * Busca en el servidor los informes de los pacientes que coinciden con el texto
+     * introducido. Si no hay texto, la tabla se deja vacía.
+     */
     private void buscarInformes() {
         String texto = informes.getTxtBusqueda().getText().trim();
         informes.getModelo().setRowCount(0);
@@ -300,6 +332,12 @@ public class DashboardMedico extends DashboardBase {
 
     // =================================================================== utilidades
 
+    /**
+     * Devuelve el texto o, si es nulo o está en blanco, el valor alternativo indicado.
+     *
+     * @param s       texto a comprobar
+     * @param siVacio valor que se devuelve si {@code s} está vacío
+     */
     private static String textoONada(String s, String siVacio) {
         return (s == null || s.isBlank()) ? siVacio : s;
     }

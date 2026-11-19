@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>UML MedManager</title>
+<style>
+  html,body{margin:0;background:#fff}
+  svg{display:block}
+  .name{font:700 13px "Segoe UI",Arial,sans-serif}
+  .stereo{font:italic 11px "Segoe UI",Arial,sans-serif}
+  .mem{font:11.5px Consolas,"Courier New",monospace;fill:#1f2328}
+  .lbl{font:11.5px "Segoe UI",Arial,sans-serif;fill:#333}
+  .mult{font:11px "Segoe UI",Arial,sans-serif;fill:#333}
+  .title{font:700 15px "Segoe UI",Arial,sans-serif;fill:#333}
+  .pkg{font:700 12px "Segoe UI",Arial,sans-serif;fill:#555}
+</style></head>
+<body><svg id="s" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+const PAL = {
+  dom:  {head:'#a8e4f5', border:'#2b9cc0'},
+  srv:  {head:'#ffbf8a', border:'#df8a3e'},
+  cli:  {head:'#c3e58f', border:'#6aa632'},
+  com:  {head:'#b8ecd0', border:'#3aa56b'},
+  ext:  {head:'#dcdcd6', border:'#8a8a84'}
+};
+const LH = 15;
+function boxH(b){
+  let h = (b.stereo?14:0) + 24;
+  if (b.attrs) h += 8 + b.attrs.length*LH;
+  if (b.methods) h += 8 + b.methods.length*LH;
+  return h + 4;
+}
+function side(b, s, off){
+  off = off==null ? .5 : off;
+  if (s==='l') return [b.x, b.y + b.h*off];
+  if (s==='r') return [b.x+b.w, b.y + b.h*off];
+  if (s==='t') return [b.x + b.w*off, b.y];
+  return [b.x + b.w*off, b.y + b.h];
+}
+function render(d){
+  const svg = document.getElementById('s');
+  svg.setAttribute('width', d.W); svg.setAttribute('height', d.H);
+  svg.setAttribute('viewBox', `0 0 ${d.W} ${d.H}`);
+  let out = `<defs>
+   <marker id="tri" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11 Z" fill="#fff" stroke="#444" stroke-width="1.2"/></marker>
+   <marker id="open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11" fill="none" stroke="#444" stroke-width="1.4"/></marker>
+  </defs>`;
+  out += `<rect x="0" y="0" width="${d.W}" height="${d.H}" fill="#fff"/>`;
+  if (d.title) out += `<text class="title" x="16" y="24">${d.title}</text>`;
+  const B = {};
+  for (const b of d.boxes){ b.h = boxH(b); B[b.id] = b; }
+  for (const p of (d.pkgs||[])){
+    out += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="6" fill="#fafaf7" stroke="#b9b9b2" stroke-dasharray="5 4"/>`;
+    out += `<text class="pkg" x="${p.x+10}" y="${p.y+17}">${p.name}</text>`;
+  }
+  // edges first (under boxes)
+  for (const e of d.edges){
+    const a = B[e.from], b = B[e.to];
+    let p1 = side(a, e.fs, e.fo), p2 = side(b, e.ts, e.to2);
+    let pts = [p1];
+    const r = e.route || 'h';
+    if (r==='h'){ const mx = e.mx!=null?e.mx:(p1[0]+p2[0])/2; pts.push([mx,p1[1]],[mx,p2[1]]); }
+    else if (r==='v'){ const my = e.my!=null?e.my:(p1[1]+p2[1])/2; pts.push([p1[0],my],[p2[0],my]); }
+    else if (r==='hv'){ pts.push([p2[0],p1[1]]); }
+    else if (r==='vh'){ pts.push([p1[0],p2[1]]); }
+    pts.push(p2);
+    const dash = (e.type==='dep'||e.type==='real') ? 'stroke-dasharray="6 4"' : '';
+    const mk = (e.type==='inh'||e.type==='real') ? 'marker-end="url(#tri)"' : (e.type==='dep'||e.type==='nav') ? 'marker-end="url(#open)"' : '';
+    out += `<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#444" stroke-width="1.3" ${dash} ${mk}/>`;
+    if (e.label){
+      // label on the longest segment
+      let best=0, bi=0;
+      if (e.lseg!=null){ bi=e.lseg; best=1; } else
+      for (let i=0;i<pts.length-1;i++){ const L=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]); if(L>best){best=L;bi=i;} }
+      const lx=(pts[bi][0]+pts[bi+1][0])/2 + (e.lx||0), ly=(pts[bi][1]+pts[bi+1][1])/2 + (e.ly||0);
+      const tw = e.label.length*6.1+10;
+      out += `<rect x="${lx-tw/2}" y="${ly-9}" width="${tw}" height="17" fill="#fff"/>`;
+      out += `<text class="lbl" x="${lx}" y="${ly+4}" text-anchor="middle">${e.label}</text>`;
+    }
+    const mpos = (p, q, dx, dy) => [p[0] + (q[0]>p[0]?8:q[0]<p[0]?-8:0) + dx, p[1] + (q[1]>p[1]?14:q[1]<p[1]?-6:0) + dy];
+    if (e.m1){ const [x,y]=mpos(p1,pts[1], e.m1dx||(pts[1][1]===p1[1]?0:8), e.m1dy||(pts[1][1]===p1[1]?-6:0)); out += `<text class="mult" x="${x}" y="${y}" text-anchor="${pts[1][0]<p1[0]?'end':'start'}">${e.m1}</text>`; }
+    if (e.m2){ const q=pts[pts.length-2]; const [x,y]=mpos(p2,q, e.m2dx||(q[1]===p2[1]?0:8), e.m2dy||(q[1]===p2[1]?-6:0)); out += `<text class="mult" x="${x}" y="${y}" text-anchor="${q[0]<p2[0]?'end':'start'}">${e.m2}</text>`; }
+  }
+  for (const b of d.boxes){
+    const c = PAL[b.pal||d.pal];
+    let y = b.y;
+    out += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="5" fill="#fff" stroke="${c.border}" stroke-width="1.5"/>`;
+    const hh = (b.stereo?14:0)+24;
+    out += `<path d="M${b.x},${b.y+hh} V${b.y+5} a5,5 0 0 1 5,-5 H${b.x+b.w-5} a5,5 0 0 1 5,5 V${b.y+hh} Z" fill="${c.head}" stroke="${c.border}" stroke-width="1.5"/>`;
+    if (b.stereo){ out += `<text class="stereo" x="${b.x+b.w/2}" y="${y+14}" text-anchor="middle">«${b.stereo}»</text>`; y+=14; }
+    out += `<text class="name" x="${b.x+b.w/2}" y="${y+17}" text-anchor="middle" ${b.abstract?'font-style="italic"':''}>${b.name}</text>`;
+    y = b.y + hh;
+    for (const sec of [b.attrs, b.methods]){
+      if (!sec) continue;
+      out += `<line x1="${b.x}" y1="${y}" x2="${b.x+b.w}" y2="${y}" stroke="${c.border}" stroke-width="1"/>`;
+      y += 6;
+      for (const m of sec){
+        const u = m.startsWith('_'); const t = u? m.slice(1): m;
+        out += `<text class="mem" x="${b.x+8}" y="${y+11}" ${u?'text-decoration="underline"':''}>${t.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</text>`;
+        y += LH;
+      }
+      y += 2;
+    }
+  }
+  for (const n of (d.notes||[])){
+    out += `<path d="M${n.x},${n.y} h${n.w-12} l12,12 v${n.h-12} h-${n.w} Z" fill="#fffbe6" stroke="#c9b458"/>`;
+    n.lines.forEach((l,i)=> out += `<text class="lbl" x="${n.x+8}" y="${n.y+16+i*15}">${l}</text>`);
+  }
+  svg.innerHTML = out;
+}
+
+const D = {};
+
+D.dominio = { W:1250, H:520, pal:'dom', title:'Capa de dominio · entidades Hibernate (paquete modelo)',
+ boxes:[
+  {id:"esp", x:40, y:388, w:230, name:'Especialidad', attrs:['-id: int','-nombre_especialidad: String','-descripcion: String'], methods:['+getters() / +setters()']},
+  {id:'rol', x:345, y:60, w:170, stereo:'enumeration', name:'Rol', pal:'ext', attrs:['RECEPCIONISTA','ENFERMERO','MEDICO']},
+  {id:'tra', x:590, y:300, w:250, name:'Trabajador', attrs:['-id: int','-dni: String','-nombre: String','-apellidos: String','-telefono: String','-rol: Rol','-usuario: String','-password_hash: String','-especialidad: Especialidad'], methods:['+getters() / +setters()']},
+  {id:'pac', x:590, y:44, w:250, name:'Paciente', attrs:['-id: int','-dni: String','-nombre: String','-apellidos: String','-telefono: String','-email: String','-direccion: String','-fecha_nacimiento: LocalDate','-alergias: String','-activo: boolean'], methods:['+getters() / +setters()']},
+  {id:'cit', x:950, y:300, w:280, name:'Cita', attrs:['-id: int','-paciente: Paciente','-trabajador: Trabajador','-fecha_hora: LocalDateTime','-estado: String','   (PENDIENTE | REALIZADA | CANCELADA)','-motivo_consulta: String','-observaciones_enfermeria: String'], methods:['+getters() / +setters()']},
+  {id:'his', x:950, y:44, w:280, name:'Historial_Medico', attrs:['-id_historial: int','-paciente: Paciente','-cita: Cita','-diagnostico: String','-tratamiento: String','-fecha_registro: LocalDateTime','-activo: boolean'], methods:['+getters() / +setters()']}
+ ],
+ edges:[
+  {from:'tra', fs:'l', fo:.72, to:'esp', ts:'r', type:'nav', label:'especialidad', m1:'0..*', m2:'0..1'},
+  {from:'tra', fs:'l', fo:.12, to:'rol', ts:'b', type:'dep', route:'hv'},
+  {from:'cit', fs:'l', fo:.35, to:'tra', ts:'r', fo2:.35, type:'nav', label:"trabajador", lx:-38, m1:"0..*", m2:"1"},
+  {from:'cit', fs:'l', fo:.12, to:'pac', ts:'r', to2:.86, type:'nav', label:'paciente', m1:'0..*', m2:'1', mx:895},
+  {from:'his', fs:'l', fo:.3, to:'pac', ts:'r', to2:.25, type:'nav', label:'paciente', m1:'0..*', m2:'1'},
+  {from:'his', fs:'b', fo:.5, to:'cit', ts:'t', to2:.5, type:'nav', route:'v', label:'cita', m1:'0..1', m2:'1'}
+ ],
+ notes:[{x:40, y:60, w:250, h:84, lines:['Se mapean con anotaciones JPA','(@Entity, @Table, @ManyToOne,','@JoinColumn). Paciente e Historial_Medico','solo admiten baja lógica (activo = false).']}]
+};
+
+D.servidor = { W:1290, H:930, pal:'srv', title:'Capa de servidor (ServidorMedManager)',
+ boxes:[
+  {id:'srv', x:30, y:60, w:250, name:'ServidorMedManager', attrs:['-PUERTO: int = 8080'], methods:['+main(args: String[]): void']},
+  {id:'run', x:400, y:60, w:200, stereo:'interface', name:'Runnable', pal:'ext', methods:['+run(): void']},
+  {id:'man', x:330, y:210, w:340, name:'ManejadorCliente', attrs:['-socket: Socket','-sesion: Trabajador','-trabajadorDAO: TrabajadorDAO','-pacienteDAO: PacienteDAO','-citaDAO: CitaDAO','-historialDAO: HistorialMedicoDAO'],
+     methods:['+run(): void','-procesarLogin(paquete, out)','-buscarPacientes(paquete, out)','-agendaMedico(...) / -agendaClinica(...)','-buscarInformes(...) / -guardarInforme(...)','-crearCita(...) / -reprogramarCita(...)','-cancelarCita(...) / -listarMedicos(out)','-guardarPaciente(...) / -bajaPaciente(...)','-comprobarFechaHora(fh: LocalDateTime)','-responder(out, accion, payload)']},
+  {id:'paq', x:790, y:60, w:240, stereo:'Serializable', name:'PaqueteRed', pal:'com', attrs:['-accion: String','-payload: Object'], methods:['+getAccion(): String','+getPayload(): Object']},
+  {id:'per', x:790, y:225, w:300, name:'Permisos', attrs:['_-PERMITIDOS: Map<String, Set<Rol>>'], methods:['_+puede(rol: Rol, accion: String): boolean']},
+  {id:"con", x:790, y:330, w:330, name:'Conversor', methods:['_+aDTO(p: Paciente, conAlergias): PacienteDTO','_+aDTO(c: Cita, datosClinicos): CitaDTO','_+aDTO(h: Historial_Medico): HistorialDTO','_+aDTO(t: Trabajador): TrabajadorDTO']},
+  {id:"err", x:790, y:449, w:330, name:'ErroresBD', methods:['_+mensajeParaUsuario(e: Throwable): String']},
+  {id:'idao', x:385, y:600, w:230, stereo:'interface', name:'IDAO<T>', methods:['+save(entity: T): void','+update(entity: T): void','+findById(id: int): T','+findAll(): List<T>']},
+  {id:'tdao', x:20, y:780, w:290, name:'TrabajadorDAO', methods:['+autenticar(usuario, password): Trabajador','+listarMedicos(): List<Trabajador>']},
+  {id:'pdao', x:325, y:780, w:300, name:'PacienteDAO', methods:['+buscar(texto): List<Paciente>','+modificarDatos(id, dni, ...): Paciente','+darDeBaja(id): int']},
+  {id:'cdao', x:640, y:780, w:310, name:'CitaDAO', methods:['+agendaDeMedico(id, dia): List<Cita>','+agendaDelDia(dia): List<Cita>','+crear(paciente, medico, fh, motivo): Cita','+reprogramar(idCita, fh): Cita','+cancelar(idCita): Cita']},
+  {id:'hdao', x:965, y:780, w:305, name:'HistorialMedicoDAO', methods:['+buscarPorPaciente(texto): List<...>','+registrarConsulta(idCita, idMedico,','    diagnostico, tratamiento, alergias)']},
+  {id:'hib', x:960, y:610, w:300, name:'HibernateUtil', attrs:['_-sessionFactory: SessionFactory'], methods:['_+getSessionFactory(): SessionFactory','_+shutdown(): void']}
+ ],
+ edges:[
+  {from:'srv', fs:'b', fo:.5, to:'man', ts:'l', to2:.2, type:'nav', route:'vh', label:'crea un hilo por cliente', ly:-1, m1:'1', m2:'0..*'},
+  {from:'man', fs:'t', fo:.5, to:'run', ts:'b', type:'real', route:'v'},
+  {from:'man', fs:'r', fo:.04, to:'paq', ts:'l', to2:.6, type:'dep', mx:700, label:'lee / responde'},
+  {from:'man', fs:'r', fo:.1831, to:"per", ts:"l", type:"dep", label:'comprueba'},
+  {from:'man', fs:'r', fo:.5915, to:"con", ts:"l", type:"dep", label:'usa'},
+  {from:'man', fs:'r', fo:.9165, to:"err", ts:"l", type:"dep", label:'usa'},
+  {from:'man', fs:'b', fo:.5, to:'idao', ts:'t', type:'dep', route:'v', label:'usa sus DAO'},
+  {from:'tdao', fs:'t', to:'idao', ts:'b', to2:.2, type:'real', route:'v', my:745},
+  {from:'pdao', fs:'t', to:'idao', ts:'b', to2:.4, type:'real', route:'v', my:745},
+  {from:'cdao', fs:'t', to:'idao', ts:'b', to2:.6, type:'real', route:'v', my:745},
+  {from:'hdao', fs:'t', fo:.3, to:'idao', ts:'b', to2:.8, type:'real', route:'v', my:745},
+  {from:'hdao', fs:'t', fo:.75, to:'hib', ts:'b', to2:.6, type:'dep', route:'v', label:'Session por operación'}
+ ],
+ notes:[{x:30, y:620, w:300, h:52, lines:['Un ServerSocket en el puerto 8080;','por cada cliente: new Thread(manejador).']}]
+};
+
+
+D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (EscritorioMedManager · Java Swing)',
+ boxes:[
+  {id:'main', x:30, y:60, w:200, name:'Main', methods:['_+main(args: String[]): void']},
+  {id:'jframe', x:470, y:50, w:150, stereo:'Swing', name:'JFrame', pal:'ext'},
+  {id:'est', x:680, y:40, w:210, stereo:'utilidad', name:'Estilo', methods:['_+botonMenu(texto): JButton','_+botonAccion(b: JButton)','_+estilizarTabla(t: JTable)']},
+  {id:'jpanel', x:960, y:50, w:150, stereo:'Swing', name:'JPanel', pal:'ext'},
+  {id:'login', x:30, y:190, w:270, name:'LoginFrame', attrs:['-textField_Usuario: JTextField','-passwordField: JPasswordField','-btn_IniciarSesion: JButton'], methods:['+intentarLogin(): void','-abrirPantallaPrincipal(t)']},
+  {id:'base', x:410, y:190, w:330, abstract:true, stereo:'abstract', name:'DashboardBase', attrs:['-cartas: CardLayout','-contenido: JPanel'], methods:['#anadirPantalla(texto, pantalla: JPanel)','#pedirAlServidor(peticion: PaqueteRed,','    alRecibir: Consumer<T>, siFalla: Runnable)','-cerrarSesion(): void']},
+  {id:'panel', x:820, y:190, w:230, name:'PanelBase', attrs:['-modelo: DefaultTableModel','-tabla: JTable','-txtBusqueda: JTextField'], methods:['+getTabla() / +getModelo()','+getTxtBusqueda(): JTextField']},
+  {id:'sel', x:1070, y:190, w:205, name:'SelectorDia', attrs:['-dia: LocalDate','-alCambiar: Runnable'], methods:['+getDia(): LocalDate']},
+  {id:'med', x:300, y:440, w:300, name:'DashboardMedico', attrs:['-agenda, -pacientes, -informes: PanelBase','-selectorDia: SelectorDia'], methods:['-cargarAgenda(): void','-abrirDialogoInforme(cita: CitaDTO)','-buscarPacientes() / -buscarInformes()']},
+  {id:'rec', x:625, y:440, w:330, name:'DashboardRecepcion', attrs:['-agenda, -pacientes: PanelBase','-selectorDia: SelectorDia'], methods:['-cargarAgenda() / -mostrarAgendaFiltrada()','-reprogramarCitaSeleccionada(): void','-cancelarCitaSeleccionada(): void','-nuevoPaciente() / -modificarPaciente()','-bajaPaciente(): void','-registrarCita(): void','-cargarHorasLibres(idMedico, dia, ...)']},
+  {id:'dlg', x:1000, y:470, w:280, name:'DialogoPaciente', attrs:['-idPaciente: int  (0 = alta)','-resultado: PacienteDTO'], methods:['_+mostrar(padre, p): PacienteDTO']},
+  {id:'jdialog', x:1065, y:605, w:150, stereo:'Swing', name:'JDialog', pal:'ext'},
+  {id:'cs', x:30, y:650, w:330, stereo:'Singleton', name:'ClienteSocket', attrs:['_-INSTANCIA: ClienteSocket','-socket: Socket','-out / -in: Object(Output|Input)Stream','-usuarioActual: TrabajadorDTO'], methods:['_+getInstance(): ClienteSocket','+enviarPeticion(login): TrabajadorDTO','+pedir(p: PaqueteRed): Object  {synchronized}','+conectar() / +cerrar()']},
+  {id:'exc', x:430, y:690, w:220, name:'ErrorServidorException', attrs:['(extends Exception)']},
+  {id:'paq', x:745, y:720, w:160, stereo:'Serializable', name:'PaqueteRed', pal:'com'},
+  {id:'acc', x:925, y:720, w:110, name:'Acciones', pal:'com'},
+  {id:'dto', x:1055, y:720, w:215, name:'DTO', pal:'com', attrs:['LoginDTO · TrabajadorDTO','PacienteDTO · CitaDTO','HistorialDTO · InformeDTO']}
+ ],
+ pkgs:[{x:730, y:685, w:555, h:140, name:'com.medmanager.comun (idéntico en el servidor)'}],
+ edges:[
+  {from:'login', fs:'t', fo:.85, to:'jframe', ts:'l', type:'inh', route:'vh'},
+  {from:'base', fs:'t', fo:.4, to:'jframe', ts:'b', to2:.6, type:'inh', route:'v'},
+  {from:'panel', fs:'t', fo:.5, to:'jpanel', ts:'b', to2:.3, type:'inh', route:'v'},
+  {from:'sel', fs:'t', fo:.5, to:'jpanel', ts:'b', to2:.7, type:'inh', route:'v'},
+  {from:'med', fs:'t', fo:.5, to:'base', ts:'b', to2:.3, type:'inh', route:'v'},
+  {from:'rec', fs:'t', fo:.3, to:'base', ts:'b', to2:.7, type:'inh', route:'v'},
+  {from:'dlg', fs:'b', fo:.53, to:'jdialog', ts:'t', type:'inh', route:'v'},
+  {from:'main', fs:'b', fo:.4, to:'login', ts:'t', to2:.3, type:'dep', route:'v', label:'abre'},
+  {from:'login', fs:'r', fo:.3, to:'base', ts:'l', to2:.3, type:'dep', label:'abre según rol', ly:-12, mx:322, lseg:2},
+  {from:'rec', fs:'r', fo:.2, to:'dlg', ts:'l', to2:.5, type:'dep', label:'abre'},
+  {from:'rec', fs:'t', fo:.9, to:'panel', ts:'b', to2:.4, type:'dep', route:'v', label:'usa', my:405},
+  {from:'rec', fs:'t', fo:.97, to:'sel', ts:'b', to2:.4, type:'dep', route:'v', my:420},
+  {from:'login', fs:'b', fo:.45, to:'cs', ts:'t', to2:.3, type:'dep', route:'v', label:'enviarPeticion(LOGIN)', my:620},
+  {from:'base', fs:'l', fo:.9, to:'cs', ts:'t', to2:.76, type:'dep', route:'hv', label:'pedir() en SwingWorker', lseg:0, ly:-11},
+  {from:'cs', fs:'r', fo:.35, to:'exc', ts:'l', type:'dep', label:'lanza'},
+  {from:'cs', fs:'b', fo:.5, to:'paq', ts:'b', to2:.5, type:'dep', route:'v', my:870, label:'envía / recibe por ObjectStreams'}
+ ]
+};
+
+const key = (location.hash||'#dominio').slice(1);
+render(D[key]);
+</script></body></html>

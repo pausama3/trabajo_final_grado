@@ -9,9 +9,20 @@ import org.mindrot.jbcrypt.BCrypt;
 
 import java.util.List;
 
+/**
+ * Acceso a datos de los trabajadores: autenticación, listado de médicos y CRUD básico.
+ * <p>
+ * Cada método abre y cierra su propia sesión de Hibernate.
+ */
 public class TrabajadorDAO implements IDAO<Trabajador> {
 
-    // Método específico para el Login seguro con BCrypt
+    /**
+     * Método específico para el Login seguro con BCrypt.
+     *
+     * @param usuario       nombre de usuario introducido
+     * @param passwordPlana contraseña en texto plano introducida
+     * @return el trabajador autenticado, o {@code null} si las credenciales no son válidas
+     */
     public Trabajador autenticar(String usuario, String passwordPlana) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             // Buscamos al trabajador por su nombre de usuario
@@ -33,6 +44,7 @@ public class TrabajadorDAO implements IDAO<Trabajador> {
     /** Todos los médicos con su especialidad, ordenados por apellidos (para elegir médico al dar cita). */
     public List<Trabajador> listarMedicos() {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // JOIN FETCH carga la especialidad ya ahora, porque se lee después de cerrar la sesión
             return session.createQuery(
                     "FROM Trabajador t LEFT JOIN FETCH t.especialidad "
                     + "WHERE t.rol = :rol ORDER BY t.apellidos, t.nombre", Trabajador.class)
@@ -41,6 +53,9 @@ public class TrabajadorDAO implements IDAO<Trabajador> {
         }
     }
 
+    // ---- Operaciones CRUD de IDAO ----
+
+    /** Inserta un trabajador. Si falla, deshace la transacción y registra el error. */
     @Override
     public void save(Trabajador entity) {
         Transaction tx = null;
@@ -54,6 +69,7 @@ public class TrabajadorDAO implements IDAO<Trabajador> {
         }
     }
 
+    /** Actualiza un trabajador. Si falla, deshace la transacción y registra el error. */
     @Override
     public void update(Trabajador entity) {
         Transaction tx = null;

@@ -9,11 +9,18 @@ import org.hibernate.Transaction;
 import com.medmanager.ServidorMedManager.modelo.Paciente;
 import com.medmanager.ServidorMedManager.util.HibernateUtil;
 
+/**
+ * Acceso a datos de los pacientes: búsqueda, modificación, baja lógica y CRUD básico.
+ * <p>
+ * Las operaciones de escritura se ejecutan en una transacción; si algo falla se
+ * deshace y la excepción se propaga para que {@code ManejadorCliente} informe al cliente.
+ */
 public class PacienteDAO implements IDAO<Paciente> {
 
     /** Busca pacientes activos por DNI, nombre, apellidos o nombre completo (máximo 50). */
     public List<Paciente> buscar(String texto) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // Búsqueda parcial ("contiene"); el parámetro evita la inyección SQL
             return session.createQuery(
                     "FROM Paciente p WHERE p.activo = true AND ("
                     + "p.dni LIKE :t OR p.nombre LIKE :t OR p.apellidos LIKE :t "
@@ -31,25 +38,26 @@ public class PacienteDAO implements IDAO<Paciente> {
      */
     public Paciente modificarDatos(int id, String dni, String nombre, String apellidos, String telefono,
                                    String email, String direccion, LocalDate fechaNacimiento) {
-        Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            tx = session.beginTransaction();
-            Paciente p = session.get(Paciente.class, id);
-            if (p == null || !p.isActivo()) {
-                throw new IllegalArgumentException("El paciente no existe o está dado de baja");
+            Transaction tx = session.beginTransaction();
+            try {
+                Paciente p = session.get(Paciente.class, id);
+                if (p == null || !p.isActivo()) {
+                    throw new IllegalArgumentException("El paciente no existe o está dado de baja");
+                }
+                p.setDni(dni);
+                p.setNombre(nombre);
+                p.setApellidos(apellidos);
+                p.setTelefono(telefono);
+                p.setEmail(email);
+                p.setDireccion(direccion);
+                p.setFecha_nacimiento(fechaNacimiento);
+                tx.commit();   // la entidad está gestionada: Hibernate genera el UPDATE automáticamente
+                return p;
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();   // antes de que se cierre la sesión
+                throw e;
             }
-            p.setDni(dni);
-            p.setNombre(nombre);
-            p.setApellidos(apellidos);
-            p.setTelefono(telefono);
-            p.setEmail(email);
-            p.setDireccion(direccion);
-            p.setFecha_nacimiento(fechaNacimiento);
-            tx.commit();
-            return p;
-        } catch (RuntimeException e) {
-            if (tx != null && tx.isActive()) tx.rollback();
-            throw e;
         }
     }
 
@@ -60,51 +68,59 @@ public class PacienteDAO implements IDAO<Paciente> {
      * @return número de citas canceladas
      */
     public int darDeBaja(int id) {
-        Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            tx = session.beginTransaction();
-            Paciente p = session.get(Paciente.class, id);
-            if (p == null || !p.isActivo()) {
-                throw new IllegalArgumentException("El paciente no existe o ya está dado de baja");
+            Transaction tx = session.beginTransaction();
+            try {
+                Paciente p = session.get(Paciente.class, id);
+                if (p == null || !p.isActivo()) {
+                    throw new IllegalArgumentException("El paciente no existe o ya está dado de baja");
+                }
+                p.setActivo(false);
+                // Actualización masiva en la misma transacción: o se hace todo o nada
+                int canceladas = session.createMutationQuery(
+                        "UPDATE Cita c SET c.estado = 'CANCELADA' "
+                        + "WHERE c.paciente.id = :id AND c.estado = 'PENDIENTE' AND c.fecha_hora >= :hoy")
+                        .setParameter("id", id)
+                        .setParameter("hoy", LocalDate.now().atStartOfDay())
+                        .executeUpdate();
+                tx.commit();
+                return canceladas;
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();   // antes de que se cierre la sesión
+                throw e;
             }
-            p.setActivo(false);
-            int canceladas = session.createMutationQuery(
-                    "UPDATE Cita c SET c.estado = 'CANCELADA' "
-                    + "WHERE c.paciente.id = :id AND c.estado = 'PENDIENTE' AND c.fecha_hora >= :hoy")
-                    .setParameter("id", id)
-                    .setParameter("hoy", LocalDate.now().atStartOfDay())
-                    .executeUpdate();
-            tx.commit();
-            return canceladas;
-        } catch (RuntimeException e) {
-            if (tx != null && tx.isActive()) tx.rollback();
-            throw e;
         }
     }
 
+    // ---- Operaciones CRUD de IDAO ----
+
+    /** Inserta un paciente nuevo. */
     @Override
     public void save(Paciente paciente) {
-        Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            tx = session.beginTransaction();
-            session.persist(paciente);
-            tx.commit();
-        } catch (RuntimeException e) {
-            if (tx != null && tx.isActive()) tx.rollback();
-            throw e;   // el error sube hasta ManejadorCliente, que avisará al cliente
+            Transaction tx = session.beginTransaction();
+            try {
+                session.persist(paciente);
+                tx.commit();
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();   // antes de que se cierre la sesión
+                throw e;   // el error sube hasta ManejadorCliente, que avisará al cliente
+            }
         }
     }
 
+    /** Sobrescribe todos los campos del paciente con los de la entidad recibida. */
     @Override
     public void update(Paciente paciente) {
-        Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            tx = session.beginTransaction();
-            session.merge(paciente);
-            tx.commit();
-        } catch (RuntimeException e) {
-            if (tx != null && tx.isActive()) tx.rollback();
-            throw e;
+            Transaction tx = session.beginTransaction();
+            try {
+                session.merge(paciente);
+                tx.commit();
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();   // antes de que se cierre la sesión
+                throw e;
+            }
         }
     }
 
@@ -115,10 +131,11 @@ public class PacienteDAO implements IDAO<Paciente> {
         }
     }
 
+    /** Todos los pacientes (activos e inactivos) ordenados por apellidos. */
     @Override
     public List<Paciente> findAll() {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             return session.createQuery("FROM Paciente ORDER BY apellidos", Paciente.class).list();
         }
     }
-}
+}

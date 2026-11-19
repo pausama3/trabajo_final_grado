@@ -2,10 +2,18 @@ package com.medmanager.ServidorMedManager.modelo;
 
 import jakarta.persistence.*;
 
+/**
+ * Entidad JPA que representa a un trabajador de la clínica (tabla {@code trabajador}).
+ * <p>
+ * Contiene las credenciales de acceso (usuario y hash de la contraseña) y el rol,
+ * que determina los permisos en el servidor. Estos datos nunca salen al cliente:
+ * se envía un {@code TrabajadorDTO} con la información pública.
+ */
 @Entity // indica que es una entidad de la BD
 @Table(name = "trabajador") // el nombre de la tabla en la BD
 public class Trabajador {
-	
+
+	/** Roles posibles; se guardan en la BD como texto (EnumType.STRING). */
 	public enum Rol {
 	    RECEPCIONISTA, ENFERMERO, MEDICO
 	}
@@ -35,16 +43,19 @@ public class Trabajador {
 	private String usuario;
 	
 	@Column(name = "password_hash", nullable = false, length = 255)
-	private String password_hash; 
+	private String password_hash;   // nunca se guarda la contraseña en claro
 
-	@ManyToOne
+	@ManyToOne   // solo los médicos tienen especialidad
 	@JoinColumn(name = "id_especialidad", nullable = true)
 	private Especialidad especialidad;
-	
+
 	// Constructores
-	public Trabajador() {	
+
+	/** Constructor vacío exigido por JPA. */
+	public Trabajador() {
 	}
-	
+
+	/** Crea un trabajador nuevo (el id lo asigna la base de datos al guardarlo). */
 	public Trabajador(String dni, String nombre, String apellidos, String telefono, Rol rol, String usuario, String password_hash, Especialidad especialidad)  {
 		this.dni = dni;
 		this.nombre = nombre;

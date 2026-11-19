@@ -34,6 +34,9 @@ import com.medmanager.escritorio.red.ErrorServidorException;
 /**
  * Estructura común de las pantallas principales: cabecera, menú lateral y zona central.
  * Cada rol (DashboardMedico, DashboardRecepcion) hereda de esta clase y solo añade sus pantallas.
+ * <p>
+ * También ofrece {@link #pedirAlServidor(PaqueteRed, Consumer, Runnable)}, que
+ * centraliza la comunicación asíncrona con el servidor y el tratamiento de errores.
  */
 public abstract class DashboardBase extends JFrame {
     private static final long serialVersionUID = 1L;
@@ -43,6 +46,12 @@ public abstract class DashboardBase extends JFrame {
     private final JPanel opciones = new JPanel();          // los botones del menú
     private final List<JButton> botones = new ArrayList<>();
 
+    /**
+     * Construye el marco común de la ventana principal.
+     *
+     * @param usuario    trabajador que ha iniciado sesión (se muestra en la cabecera)
+     * @param rolVisible texto del rol que se muestra bajo el nombre
+     */
     protected DashboardBase(TrabajadorDTO usuario, String rolVisible) {
         super("MedManager");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -57,7 +66,12 @@ public abstract class DashboardBase extends JFrame {
         setLocationRelativeTo(null);
     }
 
-    /** Las clases hijas llaman a este método: añade una pantalla y su botón en el menú. */
+    /**
+     * Las clases hijas llaman a este método: añade una pantalla y su botón en el menú.
+     *
+     * @param texto    texto del botón (también identifica la pantalla en el CardLayout)
+     * @param pantalla panel que se muestra al pulsar el botón
+     */
     protected void anadirPantalla(String texto, JPanel pantalla) {
         contenido.add(pantalla, texto);   // el texto del botón sirve de nombre de la carta
         JButton b = Estilo.botonMenu(texto);
@@ -73,6 +87,11 @@ public abstract class DashboardBase extends JFrame {
      * Envía una petición al servidor en un hilo secundario (SwingWorker) para no congelar la ventana.
      * Si va bien, 'alRecibir' se ejecuta en el hilo de Swing con la respuesta.
      * Si falla, se muestra el error y se ejecuta 'siFalla' (puede ser null).
+     *
+     * @param <T>       tipo esperado del payload de la respuesta
+     * @param peticion  paquete a enviar
+     * @param alRecibir acción que recibe la respuesta
+     * @param siFalla   acción opcional a ejecutar tras un error
      */
     @SuppressWarnings("unchecked")
     protected <T> void pedirAlServidor(PaqueteRed peticion, Consumer<T> alRecibir, Runnable siFalla) {
@@ -85,6 +104,7 @@ public abstract class DashboardBase extends JFrame {
             @Override
             protected void done() {
                 try {
+                    // El tipo concreto lo fija cada acción del protocolo (ver Acciones)
                     alRecibir.accept((T) get());
                 } catch (ExecutionException e) {
                     Throwable causa = e.getCause();
@@ -99,16 +119,24 @@ public abstract class DashboardBase extends JFrame {
                     }
                     if (siFalla != null) siFalla.run();
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                    Thread.currentThread().interrupt();   // se conserva el estado de interrupción
                 }
             }
         }.execute();
     }
 
+    /**
+     * Variante sin acción de fallo: solo se muestra el mensaje de error.
+     *
+     * @param <T>       tipo esperado del payload de la respuesta
+     * @param peticion  paquete a enviar
+     * @param alRecibir acción que recibe la respuesta
+     */
     protected <T> void pedirAlServidor(PaqueteRed peticion, Consumer<T> alRecibir) {
         pedirAlServidor(peticion, alRecibir, null);
     }
 
+    /** Muestra la pantalla indicada y resalta su botón en el menú. */
     private void mostrar(String carta, JButton activo) {
         cartas.show(contenido, carta);
         for (JButton b : botones) {
@@ -116,6 +144,7 @@ public abstract class DashboardBase extends JFrame {
         }
     }
 
+    /** Cabecera superior: logo y marca a la izquierda; usuario y rol a la derecha. */
     private JPanel crearCabecera(TrabajadorDTO usuario, String rolVisible) {
         JPanel cab = new JPanel(new BorderLayout());
         cab.setBackground(Estilo.BLANCO);
@@ -148,6 +177,7 @@ public abstract class DashboardBase extends JFrame {
         return cab;
     }
 
+    /** Menú lateral: opciones de cada rol arriba y "Cerrar sesión" abajo. */
     private JPanel crearMenu() {
         JPanel menu = new JPanel(new BorderLayout());
         menu.setBackground(Estilo.AZUL_OSCURO);
@@ -171,6 +201,7 @@ public abstract class DashboardBase extends JFrame {
         return menu;
     }
 
+    /** Cierra la sesión y vuelve a la ventana de inicio de sesión. */
     private void cerrarSesion() {
         ClienteSocket.getInstance().cerrar();   // cierra la conexión: el servidor olvida la sesión
         dispose();
@@ -189,6 +220,7 @@ public abstract class DashboardBase extends JFrame {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
+            // Se trabaja sobre una copia del contexto para no alterar el original
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(Estilo.ACENTO);

@@ -5,15 +5,15 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /**
- * Unit test for simple App.
+ * Prueba unitaria generada por la plantilla de Maven (marcador de posición).
  */
 public class AppTest 
     extends TestCase
 {
     /**
-     * Create the test case
+     * Crea el caso de prueba.
      *
-     * @param testName name of the test case
+     * @param testName nombre del caso de prueba
      */
     public AppTest( String testName )
     {
@@ -21,7 +21,7 @@ public class AppTest
     }
 
     /**
-     * @return the suite of tests being tested
+     * @return el conjunto de pruebas que se ejecutan
      */
     public static Test suite()
     {
@@ -29,7 +29,7 @@ public class AppTest
     }
 
     /**
-     * Rigourous Test :-)
+     * Prueba trivial que siempre se supera.
      */
     public void testApp()
     {
