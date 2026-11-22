@@ -1,0 +1,88 @@
+@startuml recorrido_android
+title MedManager · App Android de enfermería (Kotlin)\nRecorrido PREVISTO del código (la app aún no está programada)
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam noteBackgroundColor #FFF8DC
+hide footbox
+
+actor "Enfermera" as U
+participant "LoginActivity" as L
+participant "BuscarPacienteActivity" as B
+participant "FichaPacienteActivity" as F
+participant "Corrutina\n(lifecycleScope +\nDispatchers.IO)" as CO
+participant "ClienteSocket\n(object Kotlin)" as CS
+participant "Servidor\nMedManager" as SRV
+
+note over L, SRV
+  Diagrama del diseño previsto. Las acciones de enfermería
+  (ficha rápida y GUARDAR_OBSERVACIONES) todavía no existen en el servidor:
+  hay que actualizar este diagrama cuando la app esté terminada.
+end note
+
+== 1. Iniciar sesión ==
+autonumber 1
+U -> L : escribe usuario y contraseña y pulsa «Entrar»
+L -> L : valida campos vacíos (sin red)
+L -> CO : lifecycleScope.launch { ... }
+activate CO
+CO -> CS : withContext(Dispatchers.IO) { pedir(PaqueteRed(LOGIN, LoginDTO)) }
+CS -> SRV : Socket + ObjectOutputStream (mismo protocolo que el escritorio)
+SRV --> CS : OK + TrabajadorDTO / ERROR + mensaje
+CS --> CO : resultado
+CO -> L : de vuelta en el hilo principal
+alt rol ENFERMERO
+  L -> B : startActivity(Intent → BuscarPacienteActivity)
+else otro rol o ERROR
+  L --> U : Toast / texto con el mensaje
+end
+deactivate CO
+note right of CO
+  Android no deja usar la red en el hilo principal
+  (NetworkOnMainThreadException): por eso la petición va
+  en Dispatchers.IO y la interfaz se actualiza al volver.
+end note
+
+== 2. Buscar paciente ==
+autonumber 1
+U -> B : escribe DNI o nombre
+B -> CO : launch { withContext(IO) { pedir(BUSCAR_PACIENTES, texto) } }
+CO -> CS : pedir()
+CS -> SRV : PaqueteRed(BUSCAR_PACIENTES)
+SRV --> CS : OK + List<PacienteDTO>
+CO -> B : adapter.submitList(lista) → RecyclerView
+B --> U : lista de pacientes
+U -> B : toca un paciente
+B -> F : startActivity(Intent con el id del paciente)
+
+== 3. Ficha rápida del paciente ==
+autonumber 1
+F -> CO : launch { pedir(acción de ficha rápida, idPaciente) }
+CO -> CS : pedir()
+CS -> SRV : PaqueteRed(ficha rápida)
+SRV --> CS : OK + datos del paciente (alergias)\ny su cita del día
+CO -> F : rellena los TextView
+F --> U : ficha con alergias y la cita de hoy
+
+== 4. Guardar observaciones de enfermería ==
+autonumber 1
+U -> F : escribe las observaciones y pulsa «Guardar»
+F -> CO : launch { pedir(GUARDAR_OBSERVACIONES, CitaDTO) }
+CO -> CS : pedir()
+CS -> SRV : PaqueteRed(GUARDAR_OBSERVACIONES)
+alt OK
+  SRV --> CS : OK
+  CO -> F : Toast «Observaciones guardadas»
+  note right : el médico las verá en su agenda\n(columna «Observaciones de enfermería»)
+else ERROR
+  SRV --> CS : ERROR + mensaje
+  CO -> F : muestra el mensaje
+end
+
+== 5. Cerrar sesión ==
+autonumber 1
+U -> F : «Cerrar sesión»
+F -> CS : cerrar()
+F -> L : vuelve a LoginActivity (limpiando la pila de pantallas)
+@enduml

@@ -1,0 +1,114 @@
+@startuml recorrido_escritorio_comun
+title MedManager · App de escritorio (Java Swing)\nComún: arranque, login, panel, patrón pedirAlServidor y cierre
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam sequenceGroupBodyBackGroundColor #FFFFFF
+skinparam noteBackgroundColor #FFF8DC
+hide footbox
+
+actor "Usuario\n(médico / recepción)" as U
+participant "Main" as M
+participant "LoginFrame" as L
+participant "DashboardBase\n(clase padre)" as DB
+participant "DashboardRecepcion /\nDashboardMedico" as D
+participant "PanelBase\n(tabla + buscador)" as P
+participant "SwingWorker\n(hilo de fondo)" as SW
+participant "ClienteSocket\n(Singleton)" as CS
+participant "Servidor\nMedManager" as SRV
+
+== 1. Arranque ==
+autonumber 1
+M -> M : main(): setLookAndFeel(sistema)
+M -> L : SwingUtilities.invokeLater(new LoginFrame())\n(la interfaz se crea en el hilo de Swing, EDT)
+L --> U : muestra la ventana de login
+
+== 2. Iniciar sesión ==
+autonumber 1
+U -> L : escribe usuario y contraseña y pulsa «Iniciar sesión»
+L -> L : intentarLogin()
+alt algún campo vacío
+  L --> U : «Usuario o contraseña vacío» (no sale a la red)
+else campos rellenos
+  L -> L : bloquea el formulario y pone «Conectando...»
+  L -> SW : new SwingWorker().execute()
+  activate SW
+  SW -> CS : doInBackground(): enviarPeticion(PaqueteRed(LOGIN, LoginDTO))
+  CS -> CS : pedir() → conectar()\n(Socket a localhost:8080; primero out, después in)
+  CS -> SRV : writeObject(PaqueteRed LOGIN)
+  SRV --> CS : PaqueteRed OK + TrabajadorDTO\no ERROR + mensaje
+  alt respuesta OK
+    CS -> CS : guarda usuarioActual
+    CS --> SW : TrabajadorDTO
+    SW -> L : done() (de vuelta en el hilo de Swing)
+    L -> L : abrirPantallaPrincipal(t): switch (t.getRol())
+    alt MEDICO
+      L -> D : new DashboardMedico(t)
+    else RECEPCIONISTA
+      L -> D : new DashboardRecepcion(t)
+    else ENFERMERO u otro rol
+      L -> CS : cerrar()
+      L --> U : «Esta aplicación es para médicos y recepción»
+    end
+    L -> L : dispose() (se cierra el login)
+  else respuesta ERROR
+    CS -> CS : lanza ErrorServidorException
+    SW -> L : done(): get() lanza ExecutionException
+    L --> U : «Usuario o contraseña incorrectos»\n(o «Error de conexión con el servidor»)
+  end
+  deactivate SW
+  L -> L : reactiva el formulario
+end
+
+== 3. Construir el panel y el menú ==
+autonumber 1
+D -> DB : super(usuario, rol)
+DB -> DB : crearCabecera() (logo, nombre y rol)\ncrearMenu() (botones + «Cerrar sesión»)\ncontenido = CardLayout
+D -> P : new PanelBase(título, columnas) por cada pantalla
+D -> DB : anadirPantalla("Agenda" / "Pacientes" / ...)
+DB -> DB : añade la carta al CardLayout y su botón al menú;\nla primera pantalla es la que se ve al abrir
+D -> D : carga inicial:\nrecepción → cargarMedicos(), cargarAgenda(), buscarPacientes()\nmédico → cargarAgenda(), buscarPacientes()
+D --> U : ventana con menú lateral y la Agenda visible
+
+== 4. Patrón común: pedirAlServidor() (lo usan todas las pantallas) ==
+autonumber 1
+D -> DB : pedirAlServidor(PaqueteRed(ACCIÓN, datos), alRecibir, siFalla)
+DB -> SW : new SwingWorker().execute()
+activate SW
+SW -> CS : doInBackground(): pedir(peticion)  [synchronized]
+CS -> CS : conectar() (reutiliza la conexión si sigue abierta)
+CS -> SRV : writeObject(peticion)
+SRV --> CS : readObject() → PaqueteRed respuesta
+alt acción OK
+  CS --> SW : payload (lista de DTO, DTO o mensaje)
+  SW -> D : done() → alRecibir.accept(payload)
+  D -> P : getModelo().setRowCount(0) y addRow(...) por cada DTO
+  P --> U : tabla actualizada
+else acción ERROR (fallo de negocio)
+  CS -> CS : lanza ErrorServidorException (la conexión sigue)
+  SW -> DB : done(): JOptionPane «No se pudo completar» + mensaje del servidor
+  DB -> D : siFalla.run() (si se indicó)
+else IOException (servidor caído, timeout)
+  CS -> CS : cerrar() (la próxima petición reconecta)
+  SW -> DB : done(): JOptionPane «No hay conexión con el servidor»
+end
+deactivate SW
+note over D, SRV
+  La ventana nunca se congela: la red va en el SwingWorker
+  y la tabla solo se toca en done(), dentro del hilo de Swing.
+end note
+
+== 5. Navegar por el menú ==
+autonumber 1
+U -> DB : pulsa un botón del menú
+DB -> DB : mostrar(carta): CardLayout.show() + marca el botón activo
+DB --> U : cambia la pantalla (sin pedir nada al servidor)
+
+== 6. Cerrar sesión ==
+autonumber 1
+U -> DB : «Cerrar sesión»
+DB -> CS : cerrar() (cierra el socket: el servidor olvida la sesión)
+DB -> DB : dispose()
+DB -> L : new LoginFrame().setVisible(true)
+@enduml

@@ -1,0 +1,47 @@
+@startuml recorrido_escritorio_medico
+title MedManager · App de escritorio (Java Swing)\nMédico: agenda, consulta, pacientes e informes
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam sequenceGroupBodyBackGroundColor #FFFFFF
+skinparam noteBackgroundColor #FFF8DC
+hide footbox
+
+actor "Médico" as U
+participant "DashboardBase\n(clase padre)" as DB
+participant "DashboardMedico" as D
+participant "PanelBase\n(tabla + buscador)" as P
+participant "SwingWorker\n(hilo de fondo)" as SW
+participant "Servidor\nMedManager" as SRV
+
+== 1. Mi agenda y registrar consulta ==
+autonumber 1
+U -> D : cambia de día (SelectorDia)
+D -> DB : cargarAgenda(): pedirAlServidor(AGENDA_MEDICO, día)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)\nel servidor usa el médico de la sesión, no un id del cliente
+DB -> D : citasAgenda = lista → tabla con columna «Acción»
+U -> P : clic en «Registrar» de una cita PENDIENTE
+P -> D : MouseListener → convertRowIndexToModel → abrirDialogoInforme(cita)
+D --> U : JDialog modal: motivo, observaciones de enfermería,\ndiagnóstico, tratamiento y alergias
+U -> D : rellena y pulsa «Guardar»
+alt diagnóstico vacío
+  D --> U : «Diagnóstico obligatorio» (no sale a la red)
+else
+  D -> DB : pedirAlServidor(GUARDAR_INFORME, InformeDTO)
+  ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+  DB -> D : OK → cierra el diálogo, cargarAgenda() (cita REALIZADA)\ny buscarInformes() si había una búsqueda abierta
+end
+
+== 2. Pacientes e Informes ==
+autonumber 1
+U -> P : busca en «Pacientes»
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : tabla con alergias (el médico sí las ve)
+U -> P : busca en «Informes»
+D -> D : buscarInformes() (sin texto → tabla vacía y fin)
+D -> DB : pedirAlServidor(BUSCAR_INFORMES, texto)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : tabla del historial (o aviso «No hay informes»)
+@enduml

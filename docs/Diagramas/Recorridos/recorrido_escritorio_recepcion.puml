@@ -1,0 +1,94 @@
+@startuml recorrido_escritorio_recepcion
+title MedManager · App de escritorio (Java Swing)\nRecepción: agenda, citas y pacientes
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam sequenceGroupBodyBackGroundColor #FFFFFF
+skinparam noteBackgroundColor #FFF8DC
+hide footbox
+
+actor "Recepcionista" as U
+participant "DashboardBase\n(clase padre)" as DB
+participant "DashboardRecepcion" as D
+participant "PanelBase\n(tabla + buscador)" as P
+participant "SwingWorker\n(hilo de fondo)" as SW
+participant "Servidor\nMedManager" as SRV
+
+== 1. Agenda de la clínica ==
+autonumber 1
+U -> D : cambia de día (SelectorDia: ◀ ▶ Hoy)
+D -> D : cargarAgenda()
+D -> DB : pedirAlServidor(AGENDA_CLINICA, día)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : citasDelDia = lista
+D -> D : mostrarAgendaFiltrada()
+U -> D : elige médico en el combo o escribe en «Paciente:»
+D -> D : mostrarAgendaFiltrada()\n(filtra por idTrabajador y por nombre normalizado,\nsin tildes ni mayúsculas, sin volver al servidor)
+D -> P : rellena la tabla y guarda citasVisibles
+P --> U : citas del día filtradas
+
+== 2. Cancelar cita ==
+autonumber 1
+U -> D : selecciona fila y pulsa «Cancelar cita seleccionada»
+D -> D : citaPendienteSeleccionada()\n(sin fila o no PENDIENTE → aviso y fin)
+D --> U : JOptionPane de confirmación
+U -> D : «Sí»
+D -> DB : pedirAlServidor(CANCELAR_CITA, idCita)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : OK → cargarAgenda() y recargarHuecos()
+
+== 3. Reprogramar cita ==
+autonumber 1
+U -> D : selecciona fila y pulsa «Reprogramar cita seleccionada»
+D -> D : citaPendienteSeleccionada()
+D -> D : prepara el diálogo (JSpinner día + combo hora)
+D -> D : cargarHorasLibres(médico, día)
+D -> DB : pedirAlServidor(AGENDA_CLINICA, día)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : quita las horas ocupadas (no canceladas)\ny ofrece las franjas de 15 min libres
+D --> U : JOptionPane con los datos actuales y las horas libres
+U -> D : elige día y hora y pulsa «Aceptar»
+D -> DB : pedirAlServidor(REPROGRAMAR_CITA, CitaDTO.reprogramada(id, nuevaFechaHora))
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+alt OK
+  DB -> D : aviso «Cita reprogramada…» → cargarAgenda() y recargarHuecos()
+else ERROR (p. ej., otra recepcionista cogió el hueco)
+  DB -> D : mensaje del servidor → siFalla = cargarAgenda()
+end
+
+== 4. Registrar cita ==
+autonumber 1
+U -> D : busca paciente (DNI o nombre) y pulsa «Buscar»
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : rellena el combo de pacientes
+U -> D : elige médico o día
+D -> D : recargarHuecos() → cargarHorasLibres() (AGENDA_CLINICA)\ndescarta la respuesta si el usuario ya cambió de médico o día
+U -> D : elige hora, escribe el motivo y pulsa «Registrar cita»
+D -> D : registrarCita(): valida paciente, médico y hora;\ndesactiva el botón para no enviar dos veces
+D -> DB : pedirAlServidor(CREAR_CITA, CitaDTO.nueva(...))
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+alt OK
+  DB -> D : aviso «Cita registrada…» → recargarHuecos()\ny cargarAgenda() si la agenda muestra ese día
+else ERROR (hueco ya ocupado, fecha pasada...)
+  DB -> D : siFalla: reactiva el botón y recargarHuecos()
+end
+
+== 5. Pacientes (buscar, alta, modificar, baja) ==
+autonumber 1
+U -> P : escribe en el buscador y pulsa «Buscar» (o Enter)
+P -> D : buscarPacientes()
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : tabla de pacientes (sin alergias: RN3)
+U -> D : «Nuevo paciente» / «Modificar» (o doble clic)
+D -> D : DialogoPaciente.mostrar() → PacienteDTO (id = 0 si es alta)
+D -> DB : pedirAlServidor(GUARDAR_PACIENTE, dto)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : aviso y se busca el paciente guardado por su DNI
+U -> D : «Dar de baja» → confirmación
+D -> DB : pedirAlServidor(BAJA_PACIENTE, idPaciente)
+ref over DB, SRV : patrón común pedirAlServidor()\n(diagrama «Común», apartado 4)
+DB -> D : mensaje del servidor (citas canceladas)\n→ buscarPacientes() y cargarAgenda()
+@enduml

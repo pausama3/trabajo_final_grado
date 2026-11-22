@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
@@ -36,6 +37,8 @@ import javax.swing.SpinnerDateModel;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import com.medmanager.comun.Acciones;
 import com.medmanager.comun.CitaDTO;
@@ -63,6 +66,7 @@ public class DashboardRecepcion extends DashboardBase {
     private final PanelBase agenda;
     private final SelectorDia selectorDia;
     private final JComboBox<TrabajadorDTO> cmbFiltroMedico = new JComboBox<>();   // elemento null = todos
+    private final JTextField txtFiltroPaciente = new JTextField(14);               // vacío = todos
     private List<CitaDTO> citasDelDia = new ArrayList<>();   // todas las citas del día recibidas del servidor
     private final List<CitaDTO> citasVisibles = new ArrayList<>();   // mismas posiciones que las filas
 
@@ -89,7 +93,7 @@ public class DashboardRecepcion extends DashboardBase {
         super(usuario, "Recepción");
 
         // 1. Agenda de la clínica
-        agenda = new PanelBase("Agenda de la clínica", "Todas las citas, por día y por médico",
+        agenda = new PanelBase("Agenda de la clínica", "Todas las citas, por día, médico o paciente",
                 new String[] {"Hora", "Paciente", "Médico", "Motivo", "Estado"}, false);
         selectorDia = new SelectorDia(this::cargarAgenda);
         agenda.add(crearBarraAgenda(), BorderLayout.SOUTH);
@@ -120,11 +124,20 @@ public class DashboardRecepcion extends DashboardBase {
 
     // =================================================================== AGENDA
 
-    /** Barra inferior de la agenda: selector de día, filtro por médico y acciones sobre la cita seleccionada. */
+    /** Barra inferior de la agenda: selector de día, filtros por médico y paciente y acciones sobre la cita seleccionada. */
     private JPanel crearBarraAgenda() {
         cmbFiltroMedico.setFont(Estilo.FUENTE);
         textoCombo(cmbFiltroMedico, m -> m.getNombre() + " " + m.getApellidos(), "Todos los médicos");
         cmbFiltroMedico.addActionListener(e -> mostrarAgendaFiltrada());
+
+        // Filtra mientras se escribe (sin pulsar Enter ni ir al servidor)
+        txtFiltroPaciente.setFont(Estilo.FUENTE);
+        txtFiltroPaciente.setToolTipText("Nombre o apellidos del paciente");
+        txtFiltroPaciente.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e)  { mostrarAgendaFiltrada(); }
+            @Override public void removeUpdate(DocumentEvent e)  { mostrarAgendaFiltrada(); }
+            @Override public void changedUpdate(DocumentEvent e) { mostrarAgendaFiltrada(); }
+        });
 
         JButton btnCancelar = new JButton("Cancelar cita seleccionada");
         btnCancelar.setFont(Estilo.FUENTE);
@@ -138,6 +151,8 @@ public class DashboardRecepcion extends DashboardBase {
         filtros.setOpaque(false);
         filtros.add(etiqueta("Médico:"));
         filtros.add(cmbFiltroMedico);
+        filtros.add(etiqueta("Paciente:"));
+        filtros.add(txtFiltroPaciente);
         filtros.add(btnReprogramar);
         filtros.add(btnCancelar);
 
@@ -159,13 +174,18 @@ public class DashboardRecepcion extends DashboardBase {
         });
     }
 
-    /** Pinta las citas del día, solo las del médico elegido si hay filtro (se filtra aquí, sin ir al servidor). */
+    /**
+     * Pinta las citas del día que cumplen los filtros: el médico elegido (si hay) y el texto del paciente
+     * (si hay). Los dos filtros se combinan y se aplican aquí, sin volver a pedir los datos al servidor.
+     */
     private void mostrarAgendaFiltrada() {
         TrabajadorDTO filtro = (TrabajadorDTO) cmbFiltroMedico.getSelectedItem();
+        String textoPaciente = normalizar(txtFiltroPaciente.getText());
         citasVisibles.clear();
         agenda.getModelo().setRowCount(0);
         for (CitaDTO c : citasDelDia) {
             if (filtro != null && c.getIdTrabajador() != filtro.getId()) continue;
+            if (!textoPaciente.isEmpty() && !normalizar(c.getNombrePaciente()).contains(textoPaciente)) continue;
             citasVisibles.add(c);
             agenda.getModelo().addRow(new Object[] {
                 c.getFechaHora().format(HORA),
@@ -621,6 +641,15 @@ public class DashboardRecepcion extends DashboardBase {
     }
 
     /** Etiqueta en negrita con el estilo común de los formularios. */
+    /** Pasa el texto a minúsculas y le quita las tildes, para que "jose" encuentre a "José". */
+    private static String normalizar(String texto) {
+        if (texto == null) return "";
+        return Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .trim();
+    }
+
     private static JLabel etiqueta(String texto) {
         JLabel l = new JLabel(texto);
         l.setFont(Estilo.FUENTE_NEGRITA);

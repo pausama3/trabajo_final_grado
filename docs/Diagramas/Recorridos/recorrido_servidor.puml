@@ -1,0 +1,165 @@
+@startuml recorrido_servidor
+title MedManager · Servidor (Java, Sockets TCP, Hibernate)\nRecorrido del código en cada situación
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam noteBackgroundColor #FFF8DC
+hide footbox
+
+participant "Cliente\n(escritorio / Android)" as C
+participant "ServidorMedManager\n(main)" as S
+participant "ManejadorCliente\n(un hilo por cliente)" as MC
+participant "Permisos" as PE
+participant "DAO\n(Trabajador, Paciente,\nCita, HistorialMedico)" as DAO
+participant "HibernateUtil /\nSession" as H
+database "MySQL\n(medmanager)" as DBM
+participant "Conversor\n(entidad → DTO, RN3)" as CV
+participant "ErroresBD" as EB
+
+== 1. Arranque del servidor ==
+autonumber 1
+S -> H : HibernateUtil.getSessionFactory()\n(lee hibernate.cfg.xml, hbm2ddl = validate)
+H -> DBM : conecta y comprueba que las entidades coinciden con las tablas
+alt MySQL no disponible o tablas distintas
+  H --> S : ExceptionInInitializerError
+  S -> S : «ERROR CRÍTICO» y return (el servidor no arranca)
+end
+S -> S : new ServerSocket(8080)
+loop siempre
+  C -> S : se conecta
+  S -> S : accept() devuelve el Socket del cliente
+  S -> MC : new Thread(new ManejadorCliente(socket)).start()
+end
+note right of S
+  El hilo principal vuelve enseguida a accept():
+  cada cliente tiene su propio hilo, su propia sesión
+  y sus propios DAO.
+end note
+
+== 2. Bucle de un cliente (ManejadorCliente.run) ==
+autonumber 1
+MC -> MC : abre ObjectOutputStream (+ flush) y ObjectInputStream
+loop una conexión, muchas peticiones
+  C -> MC : writeObject(PaqueteRed)
+  MC -> MC : in.readObject()
+  alt no es un PaqueteRed
+    MC --> C : ERROR «Mensaje no válido»
+  else acción ≠ LOGIN y sesion == null
+    MC --> C : ERROR «Debes iniciar sesión»
+  else hay sesión
+    MC -> PE : Permisos.puede(sesion.getRol(), acción)
+    alt sin permiso
+      MC --> C : ERROR «No tienes permiso para esta acción»
+    else con permiso
+      MC -> MC : switch (acción) → método de la acción
+      MC -> DAO : consulta o modificación
+      DAO -> H : openSession() (+ beginTransaction si escribe)
+      H -> DBM : SQL generado por Hibernate
+      DBM --> H : filas (o error de UNIQUE, CHECK o trigger)
+      H --> DAO : entidades (commit / rollback)
+      DAO --> MC : entidades
+      MC -> CV : Conversor.aDTO(entidad, rol)\n(recepción: sin alergias ni observaciones)
+      CV --> MC : DTO
+      MC --> C : responder(OK, DTO o lista)
+    end
+  end
+  alt IllegalArgumentException / IllegalStateException
+    MC --> C : ERROR + mensaje de negocio
+  else otra RuntimeException (error de BD)
+    MC -> EB : mensajeParaUsuario(e)
+    EB --> MC : texto legible (p. ej. «El médico ya tiene una cita a esa hora»)
+    MC --> C : ERROR + texto
+  end
+end
+alt el cliente cierra (EOFException)
+  MC -> MC : «Cliente desconectado»
+end
+MC -> MC : finally: socket.close() (la sesión se pierde)
+
+== 3. LOGIN ==
+autonumber 1
+C -> MC : PaqueteRed(LOGIN, LoginDTO)
+MC -> MC : procesarLogin() (no pasa por Permisos)
+MC -> DAO : TrabajadorDAO.autenticar(usuario, contraseña)
+DAO -> DBM : FROM Trabajador WHERE usuario = :user
+DAO -> DAO : BCrypt.checkpw(contraseña, password_hash)
+alt correcto
+  DAO --> MC : Trabajador
+  MC -> MC : sesion = trabajador (se recuerda quién es y su rol)
+  MC --> C : OK + TrabajadorDTO(id, nombre, apellidos, rol)
+else usuario inexistente o clave incorrecta
+  DAO --> MC : null
+  MC --> C : ERROR «Usuario o contraseña incorrectos»
+end
+
+== 4. Consultas de lectura (agendas, pacientes, informes, médicos) ==
+autonumber 1
+C -> MC : AGENDA_MEDICO(día)
+MC -> DAO : CitaDAO.agendaDeMedico(sesion.getId_trabajador(), día)
+note right : el id sale de la sesión,\nnunca del cliente
+C -> MC : AGENDA_CLINICA(día)
+MC -> DAO : CitaDAO.agendaDelDia(día) (JOIN FETCH paciente y médico)
+C -> MC : BUSCAR_PACIENTES(texto)
+MC -> DAO : PacienteDAO.buscar(texto) (DNI, nombre o apellidos)
+C -> MC : BUSCAR_INFORMES(texto)
+MC -> DAO : HistorialMedicoDAO.buscarPorPaciente(texto)\n(texto vacío → lista vacía)
+C -> MC : LISTAR_MEDICOS
+MC -> DAO : TrabajadorDAO.listarMedicos()
+DAO --> MC : entidades
+MC -> CV : aDTO() con el filtrado por rol
+MC --> C : OK + lista de DTO
+
+== 5. CREAR_CITA y REPROGRAMAR_CITA ==
+autonumber 1
+C -> MC : CREAR_CITA(CitaDTO) / REPROGRAMAR_CITA(CitaDTO)
+MC -> MC : comprobarFechaHora():\nfranja de 15 min y no en el pasado
+MC -> DAO : CitaDAO.crear(...) / reprogramar(id, nuevaFechaHora)
+DAO -> H : beginTransaction()
+DAO -> DAO : valida: paciente activo, trabajador MEDICO,\ncita PENDIENTE, hora distinta de la actual
+DAO -> H : persist(cita) / setFecha_hora(...)
+H -> DBM : INSERT / UPDATE en commit()
+alt hueco libre
+  DBM --> H : OK
+  DAO --> MC : Cita
+  MC --> C : OK + CitaDTO
+else otro cliente cogió la misma franja (UNIQUE)
+  DBM --> H : error de clave duplicada
+  DAO -> H : rollback()
+  MC -> EB : mensajeParaUsuario(e)
+  MC --> C : ERROR «El médico ya tiene una cita a esa hora»\no «El paciente ya tiene otra cita a esa hora»
+end
+
+== 6. CANCELAR_CITA ==
+autonumber 1
+C -> MC : CANCELAR_CITA(idCita)
+MC -> DAO : CitaDAO.cancelar(id)
+DAO -> DAO : solo si está PENDIENTE → estado = CANCELADA
+DAO -> H : commit() (UPDATE automático)
+MC --> C : OK + CitaDTO
+
+== 7. GUARDAR_INFORME (cerrar la consulta) ==
+autonumber 1
+C -> MC : GUARDAR_INFORME(InformeDTO)
+MC -> MC : diagnóstico obligatorio
+MC -> DAO : HistorialMedicoDAO.registrarConsulta(idCita, sesion.id, ...)
+DAO -> DAO : la cita es del médico conectado y está PENDIENTE
+DAO -> DAO : paciente.setAlergias() · cita = REALIZADA\nnew Historial_Medico(...)
+DAO -> H : persist(informe) + commit()\n(los tres cambios en una sola transacción)
+H -> DBM : INSERT historial + UPDATE cita y paciente\n(trigger: el historial es del paciente de la cita)
+MC --> C : OK + HistorialDTO
+
+== 8. GUARDAR_PACIENTE y BAJA_PACIENTE ==
+autonumber 1
+C -> MC : GUARDAR_PACIENTE(PacienteDTO)
+MC -> MC : valida DNI/NIE, longitudes, email\ny fecha de nacimiento no futura
+alt id == 0 (alta)
+  MC -> DAO : PacienteDAO.save(new Paciente(..., activo = true))
+else modificación
+  MC -> DAO : PacienteDAO.modificarDatos(id, ...)
+end
+MC --> C : OK + PacienteDTO
+C -> MC : BAJA_PACIENTE(idPaciente)
+MC -> DAO : PacienteDAO.darDeBaja(id)\n(activo = false y cancela sus citas pendientes; RN5)
+MC --> C : OK + «Paciente dado de baja. Se han cancelado N cita(s)»
+@enduml

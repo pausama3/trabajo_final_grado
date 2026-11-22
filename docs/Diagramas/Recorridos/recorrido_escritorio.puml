@@ -1,0 +1,222 @@
+@startuml recorrido_escritorio
+title MedManager · App de escritorio (Java Swing)\nRecorrido del código en cada situación
+
+skinparam shadowing false
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam sequenceGroupBodyBackGroundColor #FFFFFF
+skinparam noteBackgroundColor #FFF8DC
+skinparam ParticipantPadding 8
+hide footbox
+
+actor "Usuario\n(médico / recepción)" as U
+participant "Main" as M
+participant "LoginFrame" as L
+participant "DashboardBase\n(clase padre)" as DB
+participant "DashboardRecepcion /\nDashboardMedico" as D
+participant "PanelBase\n(tabla + buscador)" as P
+participant "SwingWorker\n(hilo de fondo)" as SW
+participant "ClienteSocket\n(Singleton)" as CS
+participant "Servidor\nMedManager" as SRV
+
+== 1. Arranque ==
+autonumber 1
+M -> M : main(): setLookAndFeel(sistema)
+M -> L : SwingUtilities.invokeLater(new LoginFrame())\n(la interfaz se crea en el hilo de Swing, EDT)
+L --> U : muestra la ventana de login
+
+== 2. Iniciar sesión ==
+autonumber 1
+U -> L : escribe usuario y contraseña y pulsa «Iniciar sesión»
+L -> L : intentarLogin()
+alt algún campo vacío
+  L --> U : «Usuario o contraseña vacío» (no sale a la red)
+else campos rellenos
+  L -> L : bloquea el formulario y pone «Conectando...»
+  L -> SW : new SwingWorker().execute()
+  activate SW
+  SW -> CS : doInBackground(): enviarPeticion(PaqueteRed(LOGIN, LoginDTO))
+  CS -> CS : pedir() → conectar()\n(Socket a localhost:8080; primero out, después in)
+  CS -> SRV : writeObject(PaqueteRed LOGIN)
+  SRV --> CS : PaqueteRed OK + TrabajadorDTO\no ERROR + mensaje
+  alt respuesta OK
+    CS -> CS : guarda usuarioActual
+    CS --> SW : TrabajadorDTO
+    SW -> L : done() (de vuelta en el hilo de Swing)
+    L -> L : abrirPantallaPrincipal(t): switch (t.getRol())
+    alt MEDICO
+      L -> D : new DashboardMedico(t)
+    else RECEPCIONISTA
+      L -> D : new DashboardRecepcion(t)
+    else ENFERMERO u otro rol
+      L -> CS : cerrar()
+      L --> U : «Esta aplicación es para médicos y recepción»
+    end
+    L -> L : dispose() (se cierra el login)
+  else respuesta ERROR
+    CS -> CS : lanza ErrorServidorException
+    SW -> L : done(): get() lanza ExecutionException
+    L --> U : «Usuario o contraseña incorrectos»\n(o «Error de conexión con el servidor»)
+  end
+  deactivate SW
+  L -> L : reactiva el formulario
+end
+
+== 3. Construir el panel y el menú ==
+autonumber 1
+D -> DB : super(usuario, rol)
+DB -> DB : crearCabecera() (logo, nombre y rol)\ncrearMenu() (botones + «Cerrar sesión»)\ncontenido = CardLayout
+D -> P : new PanelBase(título, columnas) por cada pantalla
+D -> DB : anadirPantalla("Agenda" / "Pacientes" / ...)
+DB -> DB : añade la carta al CardLayout y su botón al menú;\nla primera pantalla es la que se ve al abrir
+D -> D : carga inicial:\nrecepción → cargarMedicos(), cargarAgenda(), buscarPacientes()\nmédico → cargarAgenda(), buscarPacientes()
+D --> U : ventana con menú lateral y la Agenda visible
+
+== 4. Patrón común: pedirAlServidor() (lo usan todas las pantallas) ==
+autonumber 1
+D -> DB : pedirAlServidor(PaqueteRed(ACCIÓN, datos), alRecibir, siFalla)
+DB -> SW : new SwingWorker().execute()
+activate SW
+SW -> CS : doInBackground(): pedir(peticion)  [synchronized]
+CS -> CS : conectar() (reutiliza la conexión si sigue abierta)
+CS -> SRV : writeObject(peticion)
+SRV --> CS : readObject() → PaqueteRed respuesta
+alt acción OK
+  CS --> SW : payload (lista de DTO, DTO o mensaje)
+  SW -> D : done() → alRecibir.accept(payload)
+  D -> P : getModelo().setRowCount(0) y addRow(...) por cada DTO
+  P --> U : tabla actualizada
+else acción ERROR (fallo de negocio)
+  CS -> CS : lanza ErrorServidorException (la conexión sigue)
+  SW -> DB : done(): JOptionPane «No se pudo completar» + mensaje del servidor
+  DB -> D : siFalla.run() (si se indicó)
+else IOException (servidor caído, timeout)
+  CS -> CS : cerrar() (la próxima petición reconecta)
+  SW -> DB : done(): JOptionPane «No hay conexión con el servidor»
+end
+deactivate SW
+note over D, SRV
+  La ventana nunca se congela: la red va en el SwingWorker
+  y la tabla solo se toca en done(), dentro del hilo de Swing.
+end note
+
+== 5. Navegar por el menú ==
+autonumber 1
+U -> DB : pulsa un botón del menú
+DB -> DB : mostrar(carta): CardLayout.show() + marca el botón activo
+DB --> U : cambia la pantalla (sin pedir nada al servidor)
+
+== 6. RECEPCIÓN · Agenda de la clínica ==
+autonumber 1
+U -> D : cambia de día (SelectorDia: ◀ ▶ Hoy)
+D -> D : cargarAgenda()
+D -> DB : pedirAlServidor(AGENDA_CLINICA, día)
+ref over DB, SRV : patrón común (4)
+DB -> D : citasDelDia = lista
+D -> D : mostrarAgendaFiltrada()
+U -> D : elige médico en el combo o escribe en «Paciente:»
+D -> D : mostrarAgendaFiltrada()\n(filtra por idTrabajador y por nombre normalizado,\nsin tildes ni mayúsculas, sin volver al servidor)
+D -> P : rellena la tabla y guarda citasVisibles
+P --> U : citas del día filtradas
+
+== 7. RECEPCIÓN · Cancelar cita ==
+autonumber 1
+U -> D : selecciona fila y pulsa «Cancelar cita seleccionada»
+D -> D : citaPendienteSeleccionada()\n(sin fila o no PENDIENTE → aviso y fin)
+D --> U : JOptionPane de confirmación
+U -> D : «Sí»
+D -> DB : pedirAlServidor(CANCELAR_CITA, idCita)
+ref over DB, SRV : patrón común (4)
+DB -> D : OK → cargarAgenda() y recargarHuecos()
+
+== 8. RECEPCIÓN · Reprogramar cita ==
+autonumber 1
+U -> D : selecciona fila y pulsa «Reprogramar cita seleccionada»
+D -> D : citaPendienteSeleccionada()
+D -> D : prepara el diálogo (JSpinner día + combo hora)
+D -> D : cargarHorasLibres(médico, día)
+D -> DB : pedirAlServidor(AGENDA_CLINICA, día)
+ref over DB, SRV : patrón común (4)
+DB -> D : quita las horas ocupadas (no canceladas)\ny ofrece las franjas de 15 min libres
+D --> U : JOptionPane con los datos actuales y las horas libres
+U -> D : elige día y hora y pulsa «Aceptar»
+D -> DB : pedirAlServidor(REPROGRAMAR_CITA, CitaDTO.reprogramada(id, nuevaFechaHora))
+ref over DB, SRV : patrón común (4)
+alt OK
+  DB -> D : aviso «Cita reprogramada…» → cargarAgenda() y recargarHuecos()
+else ERROR (p. ej., otra recepcionista cogió el hueco)
+  DB -> D : mensaje del servidor → siFalla = cargarAgenda()
+end
+
+== 9. RECEPCIÓN · Registrar cita ==
+autonumber 1
+U -> D : busca paciente (DNI o nombre) y pulsa «Buscar»
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común (4)
+DB -> D : rellena el combo de pacientes
+U -> D : elige médico o día
+D -> D : recargarHuecos() → cargarHorasLibres() (AGENDA_CLINICA)\ndescarta la respuesta si el usuario ya cambió de médico o día
+U -> D : elige hora, escribe el motivo y pulsa «Registrar cita»
+D -> D : registrarCita(): valida paciente, médico y hora;\ndesactiva el botón para no enviar dos veces
+D -> DB : pedirAlServidor(CREAR_CITA, CitaDTO.nueva(...))
+ref over DB, SRV : patrón común (4)
+alt OK
+  DB -> D : aviso «Cita registrada…» → recargarHuecos()\ny cargarAgenda() si la agenda muestra ese día
+else ERROR (hueco ya ocupado, fecha pasada...)
+  DB -> D : siFalla: reactiva el botón y recargarHuecos()
+end
+
+== 10. RECEPCIÓN · Pacientes (buscar, alta, modificar, baja) ==
+autonumber 1
+U -> P : escribe en el buscador y pulsa «Buscar» (o Enter)
+P -> D : buscarPacientes()
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común (4)
+DB -> D : tabla de pacientes (sin alergias: RN3)
+U -> D : «Nuevo paciente» / «Modificar» (o doble clic)
+D -> D : DialogoPaciente.mostrar() → PacienteDTO (id = 0 si es alta)
+D -> DB : pedirAlServidor(GUARDAR_PACIENTE, dto)
+ref over DB, SRV : patrón común (4)
+DB -> D : aviso y se busca el paciente guardado por su DNI
+U -> D : «Dar de baja» → confirmación
+D -> DB : pedirAlServidor(BAJA_PACIENTE, idPaciente)
+ref over DB, SRV : patrón común (4)
+DB -> D : mensaje del servidor (citas canceladas)\n→ buscarPacientes() y cargarAgenda()
+
+== 11. MÉDICO · Mi agenda y registrar consulta ==
+autonumber 1
+U -> D : cambia de día (SelectorDia)
+D -> DB : cargarAgenda(): pedirAlServidor(AGENDA_MEDICO, día)
+ref over DB, SRV : patrón común (4)\nel servidor usa el médico de la sesión, no un id del cliente
+DB -> D : citasAgenda = lista → tabla con columna «Acción»
+U -> P : clic en «Registrar» de una cita PENDIENTE
+P -> D : MouseListener → convertRowIndexToModel → abrirDialogoInforme(cita)
+D --> U : JDialog modal: motivo, observaciones de enfermería,\ndiagnóstico, tratamiento y alergias
+U -> D : rellena y pulsa «Guardar»
+alt diagnóstico vacío
+  D --> U : «Diagnóstico obligatorio» (no sale a la red)
+else
+  D -> DB : pedirAlServidor(GUARDAR_INFORME, InformeDTO)
+  ref over DB, SRV : patrón común (4)
+  DB -> D : OK → cierra el diálogo, cargarAgenda() (cita REALIZADA)\ny buscarInformes() si había una búsqueda abierta
+end
+
+== 12. MÉDICO · Pacientes e Informes ==
+autonumber 1
+U -> P : busca en «Pacientes»
+D -> DB : pedirAlServidor(BUSCAR_PACIENTES, texto)
+ref over DB, SRV : patrón común (4)
+DB -> D : tabla con alergias (el médico sí las ve)
+U -> P : busca en «Informes»
+D -> D : buscarInformes() (sin texto → tabla vacía y fin)
+D -> DB : pedirAlServidor(BUSCAR_INFORMES, texto)
+ref over DB, SRV : patrón común (4)
+DB -> D : tabla del historial (o aviso «No hay informes»)
+
+== 13. Cerrar sesión ==
+autonumber 1
+U -> DB : «Cerrar sesión»
+DB -> CS : cerrar() (cierra el socket: el servidor olvida la sesión)
+DB -> DB : dispose()
+DB -> L : new LoginFrame().setVisible(true)
+@enduml
