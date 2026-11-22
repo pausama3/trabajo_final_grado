@@ -1,1 +1,48 @@
+# =========================================================
+#  .gitignore · MedManager (servidor, escritorio y Android)
+# =========================================================
+
+# ---- Archivos temporales de Office / LibreOffice / Drive ----
+~$*
+~*.tmp
+*.tmp
+.~lock.*#
 .tmp.driveupload*
+.tmp.drivedownload*
+
+# ---- Java / Maven (servidor y escritorio) ----
+target/
+*.class
+*.log
+hs_err_pid*
+
+# ---- Eclipse ----
+# Los .settings, .project y .classpath SÍ se suben:
+# guardan la codificación UTF-8 y la configuración del proyecto.
+bin/
+.metadata/
+.recommenders/
+*.launch.bak
+
+# ---- Android Studio / Gradle (app de enfermería) ----
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# ---- IntelliJ / Android Studio ----
+.idea/
+*.iml
+out/
+
+# ---- Visual Studio Code ----
+.vscode/
+
+# ---- Sistema operativo ----
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -5,7 +5,7 @@
     <session-factory>
         <!-- 1. Datos físicos de conexión a tu MySQL -->
         <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
-        <property name="hibernate.connection.url">jdbc:mysql://localhost:3306/MedManager?serverTimezone=UTC</property>
+        <property name="hibernate.connection.url">jdbc:mysql://localhost:3306/medmanager?serverTimezone=UTC</property>
 <property name="hibernate.connection.username">medmanager_app</property>
 <property name="hibernate.connection.password">PON_AQUI_TU_CLAVE</property>
 

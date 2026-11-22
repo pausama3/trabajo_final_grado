@@ -67,7 +67,7 @@ h1{font-size:20px;margin:0 0 2px}
 <script>
 const TAGS={servidor:'Servidor',bd:'Base de datos',escritorio:'Escritorio',android:'Android',memoria:'Memoria'};
 const COLS=[['todo','Pendiente'],['doing','En curso'],['done','Hecho']];
-const KEY='medmanager-kanban-v4';
+const KEY='medmanager-kanban-v6';
 let n=0;const T=(title,col,tag,due,hot)=>({id:++n,title,col,tag,due:due||'',hot:!!hot});
 function seed(){n=0;return[
 T('Maven + paquetes, HibernateUtil y ServerSocket con un hilo por cliente','done','servidor'),
@@ -101,9 +101,13 @@ T('Memoria: seguridad implementada vs necesaria en clínica real (RGPD), cifrado
 T('Memoria: diagramas de clases actualizados (dominio, servidor y escritorio) + Gantt real y tabla de desviaciones','done','memoria'),
 T('Kanban y Gantt día a día actualizados al 22/11 (fases Android y entrega planificadas)','done','memoria'),
 T('Memoria: boceto de metodología, abstract (borrador), quitar indicaciones de plantilla y vías futuras renumeradas','done','memoria'),
-T('Memoria: revisar el control de cambios del Word (aceptar/rechazar, 3 comentarios) y actualizar el índice con F9','doing','memoria','2026-11-23',true),
-T('Reiniciar el servidor en Eclipse (Alt+F5) y probar «Reprogramar cita» desde la app (capturas para el §7.4 y §8)','todo','escritorio','2026-11-23',true),
-T('hibernate.cfg.xml: URL en minúsculas, show_sql=false y quitar hibernate.dialect','todo','servidor','2026-11-22',true),
+T('Memoria: revisar el control de cambios del Word (aceptar/rechazar, 3 comentarios) y actualizar el índice con F9','done','memoria'),
+T('Reiniciar el servidor en Eclipse (Alt+F5) y probar «Reprogramar cita» desde la app (capturas para el §7.4 y §8)','done','escritorio'),
+T('Agenda de recepción: filtro por nombre de paciente (sin tildes ni mayúsculas) combinado con el de médico','done','escritorio'),
+T('Memoria §4: tablas de tecnologías y herramientas (para qué / por qué) en las 5 partes','done','memoria'),
+T('Diagramas PlantUML del recorrido del código (escritorio común/recepción/médico, servidor y Android previsto)','done','memoria'),
+T('Memoria: CU-A02 «Consultar Agenda» con filtro por médico y paciente + nueva captura de la agenda (§7.4)','todo','memoria','2026-11-23'),
+T('hibernate.cfg.xml: URL en minúsculas, show_sql=false y quitar hibernate.dialect','done','servidor'),
 T('Limpiar ficheros ~$ y .tmp de Word; añadir ~$*, *.tmp y .tmp.drivedownload al .gitignore','todo','memoria','2026-11-22'),
 T('Probar triggers de UPDATE y rechazos con los datos de prueba (capturas para el §8)','todo','bd','2026-11-23'),
 T('Prueba de concurrencia: PruebaConcurrencia y dos recepcionistas con el mismo hueco','todo','servidor','2026-11-24'),
