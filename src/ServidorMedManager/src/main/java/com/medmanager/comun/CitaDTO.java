@@ -16,7 +16,7 @@ public class CitaDTO implements Serializable {
     private int id;                          // 0 si la cita aún no existe en la base de datos
     private int idPaciente;
     private String nombrePaciente;           // nombre completo, listo para mostrar
-    private String alergiasPaciente;   // RN3: solo se rellena para el médico; null para el resto
+    private String alergiasPaciente;   // RN3: solo se rellena para médico y enfermería; null para recepción
     private int idTrabajador;                // médico que atiende la cita
     private String nombreMedico;             // nombre completo del médico, listo para mostrar
     private LocalDateTime fechaHora;
@@ -75,6 +75,17 @@ public class CitaDTO implements Serializable {
      */
     public static CitaDTO reprogramada(int idCita, LocalDateTime nuevaFechaHora) {
         return new CitaDTO(idCita, 0, null, null, 0, null, nuevaFechaHora, null, null, null);
+    }
+
+    /**
+     * Para guardar las observaciones de enfermería: solo hacen falta el id de la cita y el texto.
+     *
+     * @param idCita        cita en la que se anotan las observaciones
+     * @param observaciones texto de enfermería (vacío o null las borra)
+     * @return DTO listo para enviarse con la acción {@link Acciones#GUARDAR_OBSERVACIONES}
+     */
+    public static CitaDTO conObservaciones(int idCita, String observaciones) {
+        return new CitaDTO(idCita, 0, null, null, 0, null, null, null, null, observaciones);
     }
 
     // Getters

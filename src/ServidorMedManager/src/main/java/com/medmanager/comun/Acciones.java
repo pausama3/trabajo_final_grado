@@ -8,8 +8,8 @@ package com.medmanager.comun;
  * <em>payload</em> que envía el cliente y el tipo de dato que devuelve el
  * servidor en la respuesta {@link #OK}.
  * <p>
- * Esta clase es idéntica en el proyecto de escritorio y en el del servidor:
- * ambos extremos deben compartir exactamente los mismos literales.
+ * Esta clase es idéntica en los tres proyectos (servidor, escritorio y Android):
+ * todos los extremos deben compartir exactamente los mismos literales.
  */
 public final class Acciones {
     private Acciones() { }   // no se instancia: solo contiene constantes
@@ -23,9 +23,12 @@ public final class Acciones {
     /** Respuesta del servidor cuando la petición falla; el payload es el mensaje para el usuario. */
     public static final String ERROR = "ERROR";
 
-    // ---- Común a médico y recepción ----
+    // ---- Común a todos los roles (recepción, médico y enfermería) ----
 
-    /** Búsqueda de pacientes por nombre, apellidos o DNI. */
+    /**
+     * Búsqueda de pacientes por nombre, apellidos o DNI. Las alergias solo se
+     * incluyen para el personal sanitario (médico y enfermería); recepción no las ve (RN3).
+     */
     public static final String BUSCAR_PACIENTES = "BUSCAR_PACIENTES";   // payload: String  -> List<PacienteDTO>
 
     // ---- Médico ----
@@ -51,4 +54,10 @@ public final class Acciones {
     public static final String GUARDAR_PACIENTE = "GUARDAR_PACIENTE";   // payload: PacienteDTO (id 0 = alta) -> PacienteDTO
     /** Baja lógica de un paciente. */
     public static final String BAJA_PACIENTE    = "BAJA_PACIENTE";      // payload: Integer id  -> String (resumen)
+
+    // ---- Enfermería (app Android) ----
+    /** Citas de hoy de un paciente, para la ficha rápida (los datos y alergias llegan con BUSCAR_PACIENTES). */
+    public static final String CITAS_PACIENTE_HOY    = "CITAS_PACIENTE_HOY";     // payload: Integer idPaciente -> List<CitaDTO>
+    /** Registro de las observaciones de enfermería en una cita pendiente de hoy (RN4). */
+    public static final String GUARDAR_OBSERVACIONES = "GUARDAR_OBSERVACIONES";  // payload: CitaDTO (id + observaciones) -> CitaDTO
 }

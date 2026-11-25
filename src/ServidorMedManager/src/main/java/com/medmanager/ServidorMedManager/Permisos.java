@@ -21,9 +21,11 @@ public final class Permisos {
     // acción -> roles que pueden ejecutarla (iremos añadiendo una fila por acción nueva)
     private static final Map<String, Set<Rol>> PERMITIDOS = new HashMap<>();
     static {
-        // Comunes / médico
+        // Común a todos los roles (el Conversor oculta las alergias a recepción, RN3)
         PERMITIDOS.put(Acciones.BUSCAR_PACIENTES,
                 EnumSet.of(Rol.RECEPCIONISTA, Rol.MEDICO, Rol.ENFERMERO));
+
+        // Médico
         PERMITIDOS.put(Acciones.AGENDA_MEDICO,
                 EnumSet.of(Rol.MEDICO));
         PERMITIDOS.put(Acciones.BUSCAR_INFORMES,
@@ -37,6 +39,12 @@ public final class Permisos {
                 Acciones.GUARDAR_PACIENTE, Acciones.BAJA_PACIENTE}) {
             PERMITIDOS.put(accion, EnumSet.of(Rol.RECEPCIONISTA));
         }
+
+        // Enfermería (app Android)
+        PERMITIDOS.put(Acciones.CITAS_PACIENTE_HOY,
+                EnumSet.of(Rol.ENFERMERO));
+        PERMITIDOS.put(Acciones.GUARDAR_OBSERVACIONES,
+                EnumSet.of(Rol.ENFERMERO));
     }
 
     /**

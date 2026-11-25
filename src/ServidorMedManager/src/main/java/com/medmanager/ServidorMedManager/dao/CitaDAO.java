@@ -138,6 +138,53 @@ public class CitaDAO implements IDAO<Cita> {
         }
     }
 
+    /** Citas de un paciente en un día concreto (todas, de cualquier médico), ordenadas por hora. */
+    public List<Cita> citasDePacienteEnDia(int idPaciente, LocalDate dia) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            return session.createQuery(
+                    "FROM Cita c JOIN FETCH c.paciente p JOIN FETCH c.trabajador "
+                    + "WHERE p.id = :pac AND c.fecha_hora >= :ini AND c.fecha_hora < :fin "
+                    + "ORDER BY c.fecha_hora", Cita.class)
+                    .setParameter("pac", idPaciente)
+                    .setParameter("ini", dia.atStartOfDay())
+                    .setParameter("fin", dia.plusDays(1).atStartOfDay())
+                    .list();
+        }
+    }
+
+    /**
+     * Guarda las observaciones de enfermería (RN4). Solo en citas PENDIENTES de hoy:
+     * enfermería atiende al paciente antes de que pase a consulta; una vez REALIZADA
+     * o CANCELADA la cita ya no se modifica.
+     *
+     * @param observaciones texto ya validado; {@code null} borra las anteriores
+     */
+    public Cita guardarObservaciones(int idCita, String observaciones) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction tx = session.beginTransaction();
+            try {
+
+                Cita cita = session.get(Cita.class, idCita);
+                if (cita == null) {
+                    throw new IllegalArgumentException("La cita no existe");
+                }
+                if (!"PENDIENTE".equals(cita.getEstado())) {
+                    throw new IllegalStateException("Solo se pueden anotar observaciones en citas pendientes (esta está "
+                            + cita.getEstado() + ")");
+                }
+                if (!cita.getFecha_hora().toLocalDate().equals(LocalDate.now())) {
+                    throw new IllegalStateException("Solo se pueden anotar observaciones en las citas de hoy");
+                }
+                cita.setObservaciones_enfermeria(observaciones);
+                tx.commit();   // entidad gestionada: Hibernate genera el UPDATE
+                return cita;
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();   // antes de que se cierre la sesión
+                throw e;
+            }
+        }
+    }
+
     // ---- Operaciones CRUD de IDAO ----
 
     /** Inserta una cita tal cual, sin las validaciones de {@link #crear}. */

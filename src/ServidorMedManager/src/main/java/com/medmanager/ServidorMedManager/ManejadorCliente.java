@@ -131,6 +131,12 @@ public class ManejadorCliente implements Runnable {
                         case Acciones.BAJA_PACIENTE:
                             bajaPaciente(paquete, out);
                             break;
+                        case Acciones.CITAS_PACIENTE_HOY:
+                            citasPacienteHoy(paquete, out);
+                            break;
+                        case Acciones.GUARDAR_OBSERVACIONES:
+                            guardarObservaciones(paquete, out);
+                            break;
                         default:
                             responder(out, Acciones.ERROR, "Acción desconocida: " + accion);
                     }
@@ -383,7 +389,42 @@ public class ManejadorCliente implements Runnable {
                 : "Paciente dado de baja. Se han cancelado " + canceladas + " cita(s) pendiente(s).");
     }
 
+    // ---------------------------------------------------------------- Enfermería
+
+    /** Citas de hoy del paciente para la ficha rápida, con datos clínicos (RN3: enfermería sí los ve). */
+    private void citasPacienteHoy(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof Integer)) {
+            responder(out, Acciones.ERROR, "Paciente no válido");
+            return;
+        }
+        ArrayList<CitaDTO> resultado = new ArrayList<>();
+        for (Cita c : citaDAO.citasDePacienteEnDia((Integer) paquete.getPayload(), LocalDate.now())) {
+            resultado.add(Conversor.aDTO(c, true));
+        }
+        responder(out, Acciones.OK, resultado);
+    }
+
+    /**
+     * Anota las observaciones de enfermería en una cita PENDIENTE de hoy (RN4).
+     * Un texto vacío borra las observaciones anteriores.
+     */
+    private void guardarObservaciones(PaqueteRed paquete, ObjectOutputStream out) throws IOException {
+        if (!(paquete.getPayload() instanceof CitaDTO)) {
+            responder(out, Acciones.ERROR, "Datos de la cita no válidos");
+            return;
+        }
+        CitaDTO dto = (CitaDTO) paquete.getPayload();
+        String observaciones = vacioANull(dto.getObservacionesEnfermeria());
+        comprobarTexto(observaciones, "observaciones", MAX_OBSERVACIONES, false);
+        Cita cita = citaDAO.guardarObservaciones(dto.getId(), observaciones);
+        System.out.println("🩺 Observaciones guardadas en la cita " + cita.getId_cita() + " por " + sesion.getUsuario());
+        responder(out, Acciones.OK, Conversor.aDTO(cita, true));
+    }
+
     // ---------------------------------------------------------------- Utilidades
+
+    /** Longitud máxima de las observaciones de enfermería (la columna es TEXT; se limita para evitar abusos). */
+    private static final int MAX_OBSERVACIONES = 2000;
 
     /**
      * Comprueba la obligatoriedad y la longitud máxima de un campo de texto.
