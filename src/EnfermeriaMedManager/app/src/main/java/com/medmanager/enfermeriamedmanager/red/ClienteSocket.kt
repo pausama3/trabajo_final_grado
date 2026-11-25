@@ -1,7 +1,9 @@
 package com.medmanager.enfermeriamedmanager.red
 
 import com.medmanager.comun.Acciones
+import com.medmanager.comun.CitaDTO
 import com.medmanager.comun.LoginDTO
+import com.medmanager.comun.PacienteDTO
 import com.medmanager.comun.PaqueteRed
 import com.medmanager.comun.TrabajadorDTO
 import java.io.IOException
@@ -52,6 +54,33 @@ object ClienteSocket {
         usuarioActual = trabajador
         return trabajador
     }
+
+    /**
+     * Busca pacientes activos por DNI, nombre o apellidos (máx. 50, los limita el servidor).
+     * Para enfermería el servidor incluye las alergias (RN3).
+     * Bloquea el hilo: llamar desde Dispatchers.IO.
+     */
+    fun buscarPacientes(texto: String): List<PacienteDTO> {
+        val resultado = pedir(PaqueteRed(Acciones.BUSCAR_PACIENTES, texto)) as List<*>
+        return resultado.filterIsInstance<PacienteDTO>()
+    }
+
+    /**
+     * Citas de hoy de un paciente (de cualquier médico y estado), ordenadas por hora.
+     * Bloquea el hilo: llamar desde Dispatchers.IO.
+     */
+    fun citasPacienteHoy(idPaciente: Int): List<CitaDTO> {
+        val resultado = pedir(PaqueteRed(Acciones.CITAS_PACIENTE_HOY, idPaciente)) as List<*>
+        return resultado.filterIsInstance<CitaDTO>()
+    }
+
+    /**
+     * Guarda las observaciones de enfermería de una cita (pendiente y de hoy; lo comprueba el servidor).
+     * Un texto vacío las borra. Devuelve la cita ya actualizada.
+     * Bloquea el hilo: llamar desde Dispatchers.IO.
+     */
+    fun guardarObservaciones(idCita: Int, observaciones: String): CitaDTO =
+        pedir(PaqueteRed(Acciones.GUARDAR_OBSERVACIONES, CitaDTO.conObservaciones(idCita, observaciones))) as CitaDTO
 
     private fun conectar() {
         if (socket?.isClosed == false) return   // ya conectados

@@ -1,5 +1,6 @@
 package com.medmanager.enfermeriamedmanager
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -8,8 +9,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
 import com.medmanager.enfermeriamedmanager.red.ClienteSocket            // NUEVO
 import com.medmanager.enfermeriamedmanager.red.ErrorServidorException   // NUEVO
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,38 +40,33 @@ class MainActivity : AppCompatActivity() {
             if (usuario.isEmpty() || password.isEmpty()) {
                 Toast.makeText(this, "Rellena usuario y contraseña", Toast.LENGTH_SHORT).show()
             } else {
-                // NUEVO: login contra el servidor
                 btnEntrar.isEnabled = false   // evita pulsar dos veces mientras espera
 
-                Thread {
-                    // Hilo secundario: aquí SÍ se puede usar la red
+                // Corrutina ligada a la pantalla: si se cierra, lifecycleScope la cancela sola
+                lifecycleScope.launch {
                     try {
-                        val trabajador = ClienteSocket.login(usuario, password)
+                        // La petición bloquea, así que va al hilo de E/S; al volver estamos otra vez en el principal
+                        val trabajador = withContext(Dispatchers.IO) { ClienteSocket.login(usuario, password) }
 
-                        runOnUiThread {
-                            // Hilo principal: aquí SÍ se puede tocar la pantalla
-                            btnEntrar.isEnabled = true
-                            if (trabajador.rol != "ENFERMERO") {
-                                ClienteSocket.cerrar()   // no es enfermero: se cierra la sesión
-                                Toast.makeText(this, "Esta app es solo para enfermería", Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(this, "Bienvenido/a, ${trabajador.nombre}", Toast.LENGTH_SHORT).show()
-                            }
+                        if (trabajador.rol != "ENFERMERO") {
+                            ClienteSocket.cerrar()   // no es enfermero: se cierra la sesión
+                            Toast.makeText(this@MainActivity, "Esta app es solo para enfermería", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Bienvenido/a, ${trabajador.nombre}", Toast.LENGTH_SHORT).show()
+                            // Pasa al buscador y cierra el login para que "atrás" no vuelva a él
+                            startActivity(Intent(this@MainActivity, BuscadorActivity::class.java))
+                            finish()
                         }
                     } catch (e: ErrorServidorException) {
                         // El servidor respondió ERROR (p. ej. contraseña incorrecta)
-                        runOnUiThread {
-                            btnEntrar.isEnabled = true
-                            Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
-                        }
-                    } catch (e: Exception) {
+                        Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+                    } catch (e: IOException) {
                         // Fallo de red: servidor apagado, IP mal puesta…
-                        runOnUiThread {
-                            btnEntrar.isEnabled = true
-                            Toast.makeText(this, "No se puede conectar con el servidor", Toast.LENGTH_LONG).show()
-                        }
+                        Toast.makeText(this@MainActivity, "No se puede conectar con el servidor", Toast.LENGTH_LONG).show()
+                    } finally {
+                        btnEntrar.isEnabled = true
                     }
-                }.start()   // sin start() el hilo se crea pero nunca arranca
+                }
             }
         }
     }

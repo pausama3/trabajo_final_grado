@@ -1,3 +1,47 @@
 <resources>
     <string name="app_name">EnfermeriaMedManager</string>
+
+    <!-- Buscador de pacientes -->
+    <string name="saludo">Hola, %1$s</string>
+    <string name="cerrar_sesion">Cerrar sesión</string>
+    <string name="hint_buscar">DNI, nombre o apellidos</string>
+    <string name="buscar">Buscar</string>
+    <string name="buscar_instrucciones">Busca un paciente por DNI, nombre o apellidos</string>
+    <string name="buscar_minimo">Escribe al menos %1$d caracteres</string>
+    <string name="sin_resultados">No hay pacientes que coincidan con «%1$s»</string>
+    <string name="datos_paciente">DNI %1$s · %2$d años</string>
+    <string name="datos_paciente_sin_edad">DNI %1$s</string>
+    <string name="alergias">⚠ Alergias: %1$s</string>
+    <string name="sin_alergias">Sin alergias conocidas</string>
+    <!-- Ficha rápida -->
+    <string name="volver">← Volver</string>
+    <string name="ficha_dni">DNI: %1$s</string>
+    <string name="ficha_nacimiento">Nacimiento: %1$s (%2$d años)</string>
+    <string name="ficha_telefono">Teléfono: %1$s</string>
+    <string name="sin_dato">—</string>
+    <string name="titulo_alergias">⚠ Alergias</string>
+    <string name="titulo_sin_alergias">Alergias</string>
+    <string name="titulo_citas_hoy">Citas de hoy</string>
+    <string name="sin_citas_hoy">No tiene citas hoy</string>
+    <string name="cita_hora_medico">%1$s · Dr/a. %2$s</string>
+    <string name="cita_motivo">Motivo: %1$s</string>
+    <string name="cita_observaciones">Observaciones: %1$s</string>
+    <string name="cita_sin_observaciones">Sin observaciones de enfermería</string>
+    <string name="anadir_observaciones">Añadir observaciones</string>
+    <string name="editar_observaciones">Editar observaciones</string>
+    <!-- Observaciones -->
+    <string name="titulo_observaciones">Observaciones de enfermería</string>
+    <string name="hint_observaciones">Pruebas, constantes, actuaciones…</string>
+    <string name="guardar">Guardar</string>
+    <string name="cancelar">Cancelar</string>
+    <string name="observaciones_guardadas">Observaciones guardadas</string>
+    <string name="observaciones_borradas">Observaciones borradas</string>
+    <string name="observaciones_demasiado_largas">Máximo %1$d caracteres</string>
+    <string name="no_se_pudo_guardar">No se han podido guardar</string>
+    <string name="descartar_titulo">¿Descartar los cambios?</string>
+    <string name="descartar_mensaje">Las observaciones que has escrito no se han guardado.</string>
+    <string name="descartar">Descartar</string>
+    <string name="seguir_editando">Seguir editando</string>
+
+    <string name="error_conexion">Se ha perdido la conexión con el servidor. Vuelve a iniciar sesión.</string>
 </resources>

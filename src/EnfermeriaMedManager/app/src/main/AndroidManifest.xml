@@ -21,6 +21,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Pantalla 2: buscador de pacientes (se abre tras el login) -->
+        <activity
+            android:name=".BuscadorActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <!-- Pantalla 3: ficha rápida del paciente (desde el buscador) -->
+        <activity
+            android:name=".FichaActivity"
+            android:exported="false" />
+        <!-- Pantalla 4: observaciones de una cita (desde la ficha) -->
+        <activity
+            android:name=".ObservacionesActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>
