@@ -2,6 +2,21 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Paleta común con el escritorio: mismos valores que la clase Estilo.java
+         (EscritorioMedManager/.../vista/Estilo.java). Si se cambia allí, hay que cambiarla aquí. -->
+    <color name="azul_oscuro">#FF1F3A5F</color>   <!-- AZUL_OSCURO: barras y cabeceras -->
+    <color name="azul_hover">#FF2C4F7C</color>    <!-- AZUL_HOVER: elemento pulsado o seleccionado -->
+    <color name="acento">#FF2BB3A3</color>        <!-- ACENTO: botones de acción -->
+    <color name="acento_claro">#FFD7F1EE</color>  <!-- fondo de la fila seleccionada en las tablas -->
+    <color name="fondo">#FFF2F5F9</color>         <!-- FONDO: fondo general de las pantallas -->
+    <color name="blanco">#FFFFFFFF</color>        <!-- BLANCO: tarjetas y campos -->
+    <color name="fila_alterna">#FFF7F9FC</color>  <!-- filas alternas de las tablas -->
+    <color name="texto">#FF2B2F36</color>         <!-- TEXTO: texto principal -->
+    <color name="texto_suave">#FF6B7685</color>   <!-- TEXTO_SUAVE: subtítulos y texto secundario -->
+    <color name="linea">#FFDDE3EA</color>         <!-- LINEA: bordes y separadores -->
+
+    <!-- Colores propios de Android (estados de la ficha del paciente) -->
     <color name="alerta">#FFC62828</color>   <!-- rojo: el paciente tiene alergias -->
     <color name="alerta_fondo">#FFFFEBEE</color>   <!-- fondo rojo claro del recuadro de alergias -->
     <color name="pendiente">#FF1565C0</color>   <!-- azul: cita pendiente -->

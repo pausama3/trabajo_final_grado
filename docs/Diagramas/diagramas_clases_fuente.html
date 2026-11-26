@@ -18,6 +18,7 @@ const PAL = {
   srv:  {head:'#ffbf8a', border:'#df8a3e'},
   cli:  {head:'#c3e58f', border:'#6aa632'},
   com:  {head:'#b8ecd0', border:'#3aa56b'},
+  mov:  {head:'#d9c8f0', border:'#8a63c2'},
   ext:  {head:'#dcdcd6', border:'#8a8a84'}
 };
 const LH = 15;
@@ -202,6 +203,43 @@ D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (Es
   {from:'cs', fs:'r', fo:.35, to:'exc', ts:'l', type:'dep', label:'lanza'},
   {from:'cs', fs:'b', fo:.5, to:'paq', ts:'b', to2:.5, type:'dep', route:'v', my:870, label:'envía / recibe por ObjectStreams'}
  ]
+};
+
+D.android = { W:1380, H:890, pal:'mov', title:'Capa de cliente móvil (EnfermeriaMedManager · Android / Kotlin)',
+ boxes:[
+  {id:'util', x:20, y:760, w:280, stereo:'Utilidades.kt', name:'Funciones de apoyo', methods:['+edad(fechaNacimiento): Int','+Activity.volverAlLogin()']},
+  {id:'appc', x:590, y:55, w:200, stereo:'AndroidX', name:'AppCompatActivity', pal:'ext'},
+  {id:'main', x:20, y:210, w:240, name:'MainActivity', attrs:['-etUsuario: EditText','-etPassword: EditText','-btnEntrar: Button'], methods:['#onCreate(estado: Bundle?)','   (login solo para ENFERMERO)']},
+  {id:'bus', x:320, y:210, w:290, name:'BuscadorActivity', attrs:['_+MIN_CARACTERES: Int = 2','-etBuscar: EditText','-adapter: PacienteAdapter','-resultados: ArrayList<PacienteDTO>?'], methods:['-buscar(): Unit','-mostrarResultados(pacientes, texto)','-abrirFicha(p: PacienteDTO)']},
+  {id:'fic', x:670, y:210, w:300, name:'FichaActivity', attrs:['_+EXTRA_PACIENTE: String','-paciente: PacienteDTO','-llCitas: LinearLayout'], methods:['#onResume()  → cargarCitas()','-mostrarIdentidad() / -mostrarAlergias()','-mostrarCitas(citas: List<CitaDTO>)','-abrirObservaciones(c: CitaDTO)']},
+  {id:'obs', x:1030, y:210, w:330, name:'ObservacionesActivity', attrs:['_+EXTRA_CITA: String','_+MAX_CARACTERES: Int = 2000','-cita: CitaDTO','-etObservaciones: TextInputEditText'], methods:['-mostrarResumen(): Unit','-guardar(): Unit','-salir()  (avisa si hay cambios)']},
+  {id:'rv', x:20, y:490, w:210, stereo:'AndroidX', name:'RecyclerView.Adapter', pal:'ext'},
+  {id:'ada', x:290, y:470, w:300, name:'PacienteAdapter', attrs:['-pacientes: List<PacienteDTO>','-alPulsar: (PacienteDTO) -> Unit'], methods:['+mostrar(nuevos: List<PacienteDTO>)','+onCreateViewHolder(...): Fila','+onBindViewHolder(fila, posicion)']},
+  {id:'cs', x:680, y:470, w:370, stereo:'object (Singleton)', name:'ClienteSocket', attrs:['-HOST: String = "10.0.2.2"','-PUERTO: Int = 8080','-socket: Socket?','-salida / -entrada: Object(Output|Input)Stream?','+usuarioActual: TrabajadorDTO?'], methods:['+pedir(p: PaqueteRed): Any?  {@Synchronized}','+login(usuario, password): TrabajadorDTO','+buscarPacientes(texto): List<PacienteDTO>','+citasPacienteHoy(idPaciente): List<CitaDTO>','+guardarObservaciones(idCita, texto): CitaDTO','-conectar() / +cerrar()']},
+  {id:'exc', x:1110, y:500, w:250, name:'ErrorServidorException', attrs:['(extends Exception)']},
+  {id:'paq', x:700, y:790, w:160, stereo:'Serializable', name:'PaqueteRed', pal:'com'},
+  {id:'acc', x:880, y:790, w:110, name:'Acciones', pal:'com'},
+  {id:'dto', x:1010, y:790, w:340, name:'DTO', pal:'com', attrs:['LoginDTO · TrabajadorDTO','PacienteDTO · CitaDTO']}
+ ],
+ pkgs:[{x:685, y:752, w:680, h:128, name:'com.medmanager.comun (copiado del servidor, solo las clases que usa enfermería)'}],
+ edges:[
+  {from:'main', fs:'t', fo:.5, to:'appc', ts:'l', to2:.5, type:'inh', route:'vh'},
+  {from:'bus', fs:'t', fo:.5, to:'appc', ts:'b', to2:.25, type:'inh', route:'v', my:175},
+  {from:'fic', fs:'t', fo:.3, to:'appc', ts:'b', to2:.75, type:'inh', route:'v', my:175},
+  {from:'obs', fs:'t', fo:.5, to:'appc', ts:'r', to2:.5, type:'inh', route:'vh'},
+  {from:'main', fs:'r', fo:.3, to:'bus', ts:'l', to2:.3, type:'dep', label:'abre'},
+  {from:'bus', fs:'r', fo:.3, to:'fic', ts:'l', to2:.3, type:'dep', label:'Intent'},
+  {from:'fic', fs:'r', fo:.3, to:'obs', ts:'l', to2:.3, type:'dep', label:'Intent'},
+  {from:'bus', fs:'b', fo:.25, to:'ada', ts:'t', to2:.3417, type:'dep', route:'v', label:'usa', lx:-20, ly:-12},
+  {from:'ada', fs:'l', fo:.3, to:'rv', ts:'r', type:'inh'},
+  {from:'main', fs:'b', fo:.5, to:'cs', ts:'t', to2:.06, type:'dep', route:'v', my:430},
+  {from:'bus', fs:'b', fo:.85, to:'cs', ts:'t', to2:.06, type:'dep', route:'v', my:430},
+  {from:'fic', fs:'b', fo:.5, to:'cs', ts:'t', to2:.48, type:'dep', route:'v', label:'pedir() con withContext(Dispatchers.IO)', lx:0},
+  {from:'obs', fs:'b', fo:.3, to:'cs', ts:'t', to2:.9, type:'dep', route:'v', my:430},
+  {from:'cs', fs:'r', fo:.3, to:'exc', ts:'l', type:'dep', label:'lanza'},
+  {from:'cs', fs:'b', fo:.27, to:'paq', ts:'t', type:'dep', route:'v', my:735, label:'envía / recibe por ObjectStreams', lseg:0, lx:105}
+ ],
+ notes:[{x:20, y:630, w:560, h:96, lines:['Las pantallas se pasan los datos con Intent: el buscador envía el','PacienteDTO a la ficha y la ficha envía el CitaDTO a Observaciones','(los DTO son Serializable, no hace falta volver a pedirlos).','Cada petición se lanza en lifecycleScope.launch y se ejecuta en','withContext(Dispatchers.IO), fuera del hilo principal.']}]
 };
 
 const key = (location.hash||'#dominio').slice(1);

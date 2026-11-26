@@ -1,8 +1,38 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.EnfermeriaMedManager" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+    <!-- Tema de la aplicación con la paleta del escritorio (ver colors.xml).
+         Es siempre claro, como el escritorio, para que las dos aplicaciones se vean iguales. -->
+    <style name="Base.Theme.EnfermeriaMedManager" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Principal: azul oscuro del menú lateral del escritorio -->
+        <item name="colorPrimary">@color/azul_oscuro</item>
+        <item name="colorOnPrimary">@color/blanco</item>
+        <item name="colorPrimaryContainer">@color/azul_hover</item>
+        <item name="colorOnPrimaryContainer">@color/blanco</item>
+
+        <!-- Secundario: color de acento de los botones de acción -->
+        <item name="colorSecondary">@color/acento</item>
+        <item name="colorOnSecondary">@color/blanco</item>
+        <item name="colorSecondaryContainer">@color/acento_claro</item>
+        <item name="colorOnSecondaryContainer">@color/texto</item>
+
+        <!-- Fondos, superficies y texto -->
+        <item name="android:colorBackground">@color/fondo</item>
+        <item name="colorOnBackground">@color/texto</item>
+        <item name="colorSurface">@color/blanco</item>
+        <item name="colorOnSurface">@color/texto</item>
+        <item name="colorOnSurfaceVariant">@color/texto_suave</item>
+        <item name="colorOutline">@color/linea</item>
+        <item name="colorOutlineVariant">@color/linea</item>
+
+        <!-- Errores con el mismo rojo que las alergias -->
+        <item name="colorError">@color/alerta</item>
+
+        <!-- Botones rellenos con el color de acento, como Estilo.botonAccion() del escritorio -->
+        <item name="materialButtonStyle">@style/Widget.EnfermeriaMedManager.BotonAccion</item>
+    </style>
+
+    <style name="Widget.EnfermeriaMedManager.BotonAccion" parent="Widget.Material3.Button">
+        <item name="backgroundTint">@color/boton_accion</item>
+        <item name="android:textColor">@color/blanco</item>
     </style>
 
     <style name="Theme.EnfermeriaMedManager" parent="Base.Theme.EnfermeriaMedManager" />

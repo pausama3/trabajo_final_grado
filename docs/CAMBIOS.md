@@ -4,6 +4,137 @@ Cada entrada explica qué ha cambiado, por qué y cómo se prueba. Las más reci
 
 ---
 
+## 26/11/2026 · Kanban y Gantt día a día actualizados
+
+### Cambios
+
+- `docs/Kanban MedManager.html`:
+  - Pasan a «Hecho»: paleta Android igual que el escritorio, Gantt simplificado, §6.6 de la
+    memoria (diagrama de clases Android) y esta actualización.
+  - La tarjeta «diagrama de clases de Android y wireframes finales» se queda solo con los
+    wireframes (§7.1 «BOCETOS FIGMA» y la fila de Figma del §4.2, que aún cita el escáner QR).
+  - Tareas nuevas: dirección del servidor configurable en Android (28/11) y redactar la interfaz
+    Android del §7.4 y rehacer sus capturas con la paleta nueva (29/11). La de los márgenes del
+    login incluye ahora compilar con la paleta nueva.
+  - Replanificadas: observaciones como médico y márgenes del login → 27/11; CU-A02, figura del
+    Gantt §5.4, enlace Kroki y JAR → 28/11.
+  - La clave de `localStorage` pasa a `medmanager-kanban-v8`: los cambios hechos a mano en el
+    navegador sobre la versión anterior no se conservan.
+- `docs/Diagramas/Diagrama de Gantt dia a dia.xlsx`:
+  - Fila nueva «Tarea 3.4: diagramas de clases actualizados y Android» (19/11–26/11, 100 %).
+  - «JAR ejecutable y comprobación de las observaciones como médico» pasa al 27–28/11, y la fase
+    de escritorio termina el 28/11.
+
+---
+
+## 26/11/2026 · Memoria §6.6: capa de cliente móvil (Android) y su diagrama de clases
+
+### Motivo
+
+En el §6.6 (Diagramas de clases), el apartado «Capa de Cliente Móvil (Android / Kotlin)» solo tenía
+el título. El resto de capas (dominio, servidor y escritorio) ya tenían texto y diagrama.
+
+### Cambios
+
+- `docs/Diagramas/diagramas_clases_fuente.html`: nuevo diagrama `#android`, con el mismo estilo que
+  los otros y un color morado propio (`mov`). Incluye las 4 actividades y su herencia de
+  `AppCompatActivity`, la navegación con `Intent`, `PacienteAdapter`, `ClienteSocket` (`object`),
+  `ErrorServidorException`, las funciones de `Utilidades.kt` y el paquete `comun`.
+- `docs/Diagramas/Diagrama de clases Cliente Android.png`: el diagrama exportado a 2760×1780 px
+  (escala ×2, como los demás) con Edge en modo headless.
+- `docs/Entregas/DAM Plantilla memoria escrita.docx`, §6.6 «Capa de Cliente Móvil»:
+  - Un párrafo de introducción y 6 viñetas con el mismo formato que la capa de escritorio:
+    `ClienteSocket`, paquete `comun`, actividades (CU-E01 a CU-E04), `PacienteAdapter`,
+    `Utilidades.kt` y corrutinas.
+  - La figura del diagrama con su pie: «Figura: Diagrama de clases de la aplicación Android
+    (elaboración propia)».
+
+### Cómo comprobarlo
+
+- Abrir la memoria en Word y actualizar el índice: el §6.6 crece casi una página y desplaza los
+  números de página siguientes.
+- Para regenerar el PNG, abrir `diagramas_clases_fuente.html#android` en el navegador.
+
+---
+
+## 25/11/2026 · Gantt día a día simplificado con las tareas del pronóstico
+
+### Motivo
+
+El Gantt día a día tenía 63 filas, muchas de ellas mini tareas (arreglos, revisiones de una tarde).
+Así no se podía comparar con el pronóstico. Ahora tiene las mismas fases y tareas que el pronóstico,
+con las fechas reales sacadas de los commits de git y del trabajo hecho.
+
+### Cambios
+
+- `docs/Diagramas/Diagrama de Gantt dia a dia.xlsx`: pasa a 35 filas en 5 fases, las mismas que el
+  pronóstico.
+  - **Documentación y Diseño (22/09–11/12):** propuesta (22/09–05/10), diagramas (24–27/09),
+    Tarea 1 (18–28/10), Tarea 3.1 (29/10–02/11), Tarea 2 (02–22/11), entrega para feedback (05/11)
+    y §7 de la memoria (13–25/11), todas al 100 %. Pendientes: metodología y capturas (5–6/12),
+    Tarea 4 (7/12), Tarea 5 (8/12) y Tarea 6, vídeo y entrega (9–11/12).
+  - **Base de Datos (08/10–27/11):** DDL, restricciones y triggers, usuarios y datos de prueba
+    hechos. Pendiente: verificación de triggers (27/11).
+  - **Servidor (08/10–02/12):** Hibernate, ORM, ServerSocket, protocolo y seguridad, DAO y acciones
+    hechos. Pendiente: concurrencia y JUnit (27/11–02/12).
+  - **Escritorio (15/11–27/11):** ventanas, conexión y módulos hechos. Pendiente: JAR y comprobar
+    las observaciones como médico (26–27/11).
+  - **Android (22/11–04/12):** layouts con la paleta del escritorio, corrutinas, ficha y
+    observaciones hechos. Pendiente: pruebas de integración (04/12).
+- Las mini tareas desaparecen como filas propias y quedan dentro de la tarea grande a la que
+  pertenecen. Por ejemplo, los arreglos de `hibernate.cfg.xml` entran en «DAO y acciones», y el
+  arreglo de la compilación Android en «Diseño de layouts».
+
+### Cómo comprobarlo
+
+Abrir el Excel: las barras grises (hechas) coinciden con las fechas de `git log` y las pendientes
+empiezan a partir del 26/11. La captura `Diagrama de Gantt real 19-11-2026.png` de la memoria (§5.4)
+es anterior y habrá que rehacerla al final.
+
+---
+
+## 25/11/2026 · App Android con la misma paleta de colores que el escritorio
+
+### Motivo
+
+Las dos aplicaciones deben tener la misma imagen. La app Android usaba los colores por defecto de
+Material 3 (morado), y el escritorio tiene su paleta en `Estilo.java`. Ese fichero no se puede
+reutilizar en Android porque depende de `java.awt.Color` y de Swing, así que se copian sus valores.
+
+### Cambios
+
+- `res/values/colors.xml`: se añaden los colores de `Estilo.java` con los mismos valores hexadecimales
+  (`azul_oscuro`, `azul_hover`, `acento`, `fondo`, `blanco`, `texto`, `texto_suave`, `linea`), más
+  `acento_claro` y `fila_alterna`, que el escritorio usa en las tablas. Un comentario recuerda que,
+  si se cambia la paleta en `Estilo.java`, hay que cambiarla también aquí.
+- `res/values/themes.xml`: el tema pasa a `Theme.Material3.Light.NoActionBar` y asigna la paleta a
+  los roles de Material 3: primario = azul oscuro, secundario = acento, fondo = `fondo`,
+  superficies = blanco, texto = `texto`/`texto_suave`, bordes = `linea`, error = `alerta`.
+  Los layouts ya usan los estilos de Material, así que botones, campos y tarjetas cogen los colores
+  sin tocar los XML.
+- Botones rellenos con el color de acento, igual que `Estilo.botonAccion()`: estilo
+  `Widget.EnfermeriaMedManager.BotonAccion` en el tema y nuevo `res/color/boton_accion.xml`
+  (acento cuando el botón está activo, gris `linea` cuando está desactivado). Los botones de texto
+  siguen en azul oscuro.
+- Se borra `res/values-night/themes.xml`: en modo oscuro sustituía el tema sin colores y la paleta
+  se perdía. La app queda siempre en modo claro, como el escritorio.
+- No se copian las fuentes: Segoe UI no existe en Android y se mantiene la fuente del sistema (Roboto).
+- `docs/Entregas/DAM Plantilla memoria escrita.docx`: en §7.4 Interfaz → «Aplicación Android» se
+  añade un párrafo al final que explica que la app usa la paleta de `Estilo` copiada a `colors.xml`
+  y aplicada en el tema de Material 3. Las capturas de ese apartado son anteriores al cambio de
+  colores y habrá que rehacerlas.
+
+### Cómo probarlo
+
+1. Compilar y ejecutar la app en el emulador.
+2. Los botones rellenos se ven en verde azulado (acento), los botones de texto y el borde de los campos con foco
+   en azul oscuro, y el fondo de las pantallas es el gris azulado del escritorio.
+3. Activar el modo oscuro del teléfono: la app debe seguir viéndose igual.
+
+**No se ha compilado con Gradle.**
+
+---
+
 ## 25/11/2026 · Kanban y Gantt día a día actualizados
 
 ### Motivo

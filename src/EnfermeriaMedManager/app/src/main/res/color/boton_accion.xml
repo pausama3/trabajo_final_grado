@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo de los botones de acción: color de acento del escritorio y gris cuando están desactivados -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:color="@color/linea" />
+    <item android:color="@color/acento" />
+</selector>
