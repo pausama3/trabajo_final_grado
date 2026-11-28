@@ -164,7 +164,7 @@ D.servidor = { W:1290, H:930, pal:'srv', title:'Capa de servidor (ServidorMedMan
 };
 
 
-D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (EscritorioMedManager · Java Swing)',
+D.cliente = { W:1590, H:900, pal:'cli', title:'Capa de cliente de escritorio (EscritorioMedManager · Java Swing)',
  boxes:[
   {id:'main', x:30, y:60, w:200, name:'Main', methods:['_+main(args: String[]): void']},
   {id:'jframe', x:470, y:50, w:150, stereo:'Swing', name:'JFrame', pal:'ext'},
@@ -178,6 +178,7 @@ D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (Es
   {id:'rec', x:625, y:440, w:330, name:'DashboardRecepcion', attrs:['-agenda, -pacientes: PanelBase','-selectorDia: SelectorDia'], methods:['-cargarAgenda() / -mostrarAgendaFiltrada()','-reprogramarCitaSeleccionada(): void','-cancelarCitaSeleccionada(): void','-nuevoPaciente() / -modificarPaciente()','-bajaPaciente(): void','-registrarCita(): void','-cargarHorasLibres(idMedico, dia, ...)']},
   {id:'dlg', x:1000, y:470, w:280, name:'DialogoPaciente', attrs:['-idPaciente: int  (0 = alta)','-resultado: PacienteDTO'], methods:['_+mostrar(padre, p): PacienteDTO']},
   {id:'jdialog', x:1065, y:605, w:150, stereo:'Swing', name:'JDialog', pal:'ext'},
+  {id:'val', x:1340, y:456, w:235, stereo:'utilidad', name:'Validaciones', attrs:['_+FECHA: DateTimeFormatter'], methods:['_+esDniONie(texto): boolean','_+esEmail(texto): boolean','_+leerFecha(texto): LocalDate']},
   {id:'cs', x:30, y:650, w:330, stereo:'Singleton', name:'ClienteSocket', attrs:['_-INSTANCIA: ClienteSocket','-socket: Socket','-out / -in: Object(Output|Input)Stream','-usuarioActual: TrabajadorDTO'], methods:['_+getInstance(): ClienteSocket','+enviarPeticion(login): TrabajadorDTO','+pedir(p: PaqueteRed): Object  {synchronized}','+conectar() / +cerrar()']},
   {id:'exc', x:430, y:690, w:220, name:'ErrorServidorException', attrs:['(extends Exception)']},
   {id:'paq', x:745, y:720, w:160, stereo:'Serializable', name:'PaqueteRed', pal:'com'},
@@ -196,6 +197,7 @@ D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (Es
   {from:'main', fs:'b', fo:.4, to:'login', ts:'t', to2:.3, type:'dep', route:'v', label:'abre'},
   {from:'login', fs:'r', fo:.3, to:'base', ts:'l', to2:.3, type:'dep', label:'abre según rol', ly:-12, mx:322, lseg:2},
   {from:'rec', fs:'r', fo:.2, to:'dlg', ts:'l', to2:.5, type:'dep', label:'abre'},
+  {from:'dlg', fs:'r', fo:.5, to:'val', ts:'l', to2:.5, type:'dep', label:'usa'},
   {from:'rec', fs:'t', fo:.9, to:'panel', ts:'b', to2:.4, type:'dep', route:'v', label:'usa', my:405},
   {from:'rec', fs:'t', fo:.97, to:'sel', ts:'b', to2:.4, type:'dep', route:'v', my:420},
   {from:'login', fs:'b', fo:.45, to:'cs', ts:'t', to2:.3, type:'dep', route:'v', label:'enviarPeticion(LOGIN)', my:620},
@@ -205,14 +207,14 @@ D.cliente = { W:1300, H:900, pal:'cli', title:'Capa de cliente de escritorio (Es
  ]
 };
 
-D.android = { W:1380, H:890, pal:'mov', title:'Capa de cliente móvil (EnfermeriaMedManager · Android / Kotlin)',
+D.android = { W:1380, H:910, pal:'mov', title:'Capa de cliente móvil (EnfermeriaMedManager · Android / Kotlin)',
  boxes:[
-  {id:'util', x:20, y:760, w:280, stereo:'Utilidades.kt', name:'Funciones de apoyo', methods:['+edad(fechaNacimiento): Int','+Activity.volverAlLogin()']},
+  {id:'util', x:20, y:745, w:345, stereo:'Utilidades.kt', name:'Funciones de apoyo', attrs:['_+MIN_CARACTERES_BUSQUEDA: Int = 2','_+MAX_CARACTERES_OBSERVACIONES: Int = 2000'], methods:['+edad(fechaNacimiento, hoy = now()): Int','+busquedaValida(texto): Boolean','+observacionesValidas(texto): Boolean','+Activity.volverAlLogin()']},
   {id:'appc', x:590, y:55, w:200, stereo:'AndroidX', name:'AppCompatActivity', pal:'ext'},
   {id:'main', x:20, y:210, w:240, name:'MainActivity', attrs:['-etUsuario: EditText','-etPassword: EditText','-btnEntrar: Button'], methods:['#onCreate(estado: Bundle?)','   (login solo para ENFERMERO)']},
-  {id:'bus', x:320, y:210, w:290, name:'BuscadorActivity', attrs:['_+MIN_CARACTERES: Int = 2','-etBuscar: EditText','-adapter: PacienteAdapter','-resultados: ArrayList<PacienteDTO>?'], methods:['-buscar(): Unit','-mostrarResultados(pacientes, texto)','-abrirFicha(p: PacienteDTO)']},
+  {id:'bus', x:320, y:210, w:290, name:'BuscadorActivity', attrs:['_+MIN_CARACTERES = MIN_CARACTERES_BUSQUEDA','-etBuscar: EditText','-adapter: PacienteAdapter','-resultados: ArrayList<PacienteDTO>?'], methods:['-buscar(): Unit','-mostrarResultados(pacientes, texto)','-abrirFicha(p: PacienteDTO)']},
   {id:'fic', x:670, y:210, w:300, name:'FichaActivity', attrs:['_+EXTRA_PACIENTE: String','-paciente: PacienteDTO','-llCitas: LinearLayout'], methods:['#onResume()  → cargarCitas()','-mostrarIdentidad() / -mostrarAlergias()','-mostrarCitas(citas: List<CitaDTO>)','-abrirObservaciones(c: CitaDTO)']},
-  {id:'obs', x:1030, y:210, w:330, name:'ObservacionesActivity', attrs:['_+EXTRA_CITA: String','_+MAX_CARACTERES: Int = 2000','-cita: CitaDTO','-etObservaciones: TextInputEditText'], methods:['-mostrarResumen(): Unit','-guardar(): Unit','-salir()  (avisa si hay cambios)']},
+  {id:'obs', x:1030, y:210, w:330, name:'ObservacionesActivity', attrs:['_+EXTRA_CITA: String','_+MAX_CARACTERES = MAX_CARACTERES_OBSERVACIONES','-cita: CitaDTO','-etObservaciones: TextInputEditText'], methods:['-mostrarResumen(): Unit','-guardar(): Unit','-salir()  (avisa si hay cambios)']},
   {id:'rv', x:20, y:490, w:210, stereo:'AndroidX', name:'RecyclerView.Adapter', pal:'ext'},
   {id:'ada', x:290, y:470, w:300, name:'PacienteAdapter', attrs:['-pacientes: List<PacienteDTO>','-alPulsar: (PacienteDTO) -> Unit'], methods:['+mostrar(nuevos: List<PacienteDTO>)','+onCreateViewHolder(...): Fila','+onBindViewHolder(fila, posicion)']},
   {id:'cs', x:680, y:470, w:370, stereo:'object (Singleton)', name:'ClienteSocket', attrs:['-HOST: String = "10.0.2.2"','-PUERTO: Int = 8080','-socket: Socket?','-salida / -entrada: Object(Output|Input)Stream?','+usuarioActual: TrabajadorDTO?'], methods:['+pedir(p: PaqueteRed): Any?  {@Synchronized}','+login(usuario, password): TrabajadorDTO','+buscarPacientes(texto): List<PacienteDTO>','+citasPacienteHoy(idPaciente): List<CitaDTO>','+guardarObservaciones(idCita, texto): CitaDTO','-conectar() / +cerrar()']},
