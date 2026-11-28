@@ -33,12 +33,12 @@ INSERT INTO paciente (dni, nombre, apellidos, telefono, email, direccion, fecha_
 -- Dos citas con el médico medico1. Fechas: cámbialas si quieres otras
 -- (minutos siempre 00, 15, 30 o 45).
 INSERT INTO cita (id_paciente, id_trabajador, fecha_hora, estado, motivo_consulta)
-SELECT p.id_paciente, t.id_trabajador, '2026-11-16 09:00:00', 'PENDIENTE', 'Revisión anual'
+SELECT p.id_paciente, t.id_trabajador, TIMESTAMP(CURDATE(), '12:00:00'), 'PENDIENTE', 'Revisión anual'
 FROM paciente p, trabajador t WHERE p.dni = '55555555E' AND t.usuario = 'medico1';
 
 INSERT INTO cita (id_paciente, id_trabajador, fecha_hora, estado, motivo_consulta)
-SELECT p.id_paciente, t.id_trabajador, '2026-11-16 09:15:00', 'PENDIENTE', 'Dolor de espalda'
-FROM paciente p, trabajador t WHERE p.dni = '66666666F' AND t.usuario = 'medico1';
+SELECT p.id_paciente, t.id_trabajador, TIMESTAMP(CURDATE(), '19:30:00'), 'PENDIENTE', 'Control pediátrico'
+FROM paciente p, trabajador t WHERE p.dni = '66666666F' AND t.usuario = 'medico2';
 
 -- Comprobación
 SELECT id_trabajador, usuario, rol, id_especialidad FROM trabajador;

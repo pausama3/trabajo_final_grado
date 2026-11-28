@@ -33,7 +33,7 @@ class ObservacionesActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_CITA = "cita"
-        const val MAX_CARACTERES = 2000   // el mismo límite que MAX_OBSERVACIONES del servidor
+        const val MAX_CARACTERES = MAX_CARACTERES_OBSERVACIONES   // definido en Utilidades.kt
         private val FORMATO_HORA = DateTimeFormatter.ofPattern("HH:mm")
     }
 
@@ -109,7 +109,7 @@ class ObservacionesActivity : AppCompatActivity() {
 
     private fun guardar() {
         val texto = textoActual()
-        if (texto.length > MAX_CARACTERES) {   // el contador ya avisa, pero se comprueba igualmente
+        if (!observacionesValidas(texto)) {   // el contador ya avisa, pero se comprueba igualmente
             etObservaciones.error = getString(R.string.observaciones_demasiado_largas, MAX_CARACTERES)
             return
         }

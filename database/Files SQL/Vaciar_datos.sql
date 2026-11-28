@@ -1,0 +1,8 @@
+USE medmanager;
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE historial_medico;
+TRUNCATE TABLE cita;
+TRUNCATE TABLE paciente;
+TRUNCATE TABLE trabajador;
+TRUNCATE TABLE especialidad;
+SET FOREIGN_KEY_CHECKS = 1;

@@ -4,6 +4,45 @@ Cada entrada explica qué ha cambiado, por qué y cómo se prueba. Las más reci
 
 ---
 
+## 27/11/2026 · Pruebas de base de datos: `Test.sql` y memoria §8.1 coherentes
+
+### Cambios
+
+- `database/Files SQL/Test.sql` reescrito en el orden de la memoria: cita correcta de Ana
+  (`@pac1`) con `medico1` y `SET @cita = LAST_INSERT_ID()` justo después; PBD-02 Pedro
+  (`@pac2`) con el mismo médico; PBD-02b Ana con `medico2`; PBD-03 cancelar `@cita` y repetir
+  el INSERT de Pedro; PBD-04a/04b con el enfermero; `ROLLBACK`. Cada prueba lleva un comentario
+  con el error esperado. Fuera `@rec` y las sentencias repetidas del final.
+- Memoria §8.1 con el mismo código y textos que el script: variables sin `@rec` ni `@cita`,
+  INSERT de Ana y de Pedro por separado en PBD-02, `UPDATE … 'CANCELADA'` en PBD-03 y títulos
+  de PBD-04a/04b solo con el enfermero.
+- Pendiente: repetir las capturas de PBD-02, PBD-02b y PBD-03 con el script nuevo.
+
+### Cómo se prueba
+
+Ejecutar `Test.sql` sentencia a sentencia en Workbench y comprobar que cada error coincide con
+el comentario: 3819, 1062 (`uq_cita_medico_franja`), 1062 (`uq_cita_paciente_franja`), OK,
+1644, 1644.
+
+---
+
+## 27/11/2026 · Memoria §8.1 (pruebas de base de datos): erratas corregidas
+
+### Cambios
+
+- `docs/Entregas/DAM Plantilla memoria escrita.docx`, §8.1:
+  - Ortografía: «tenia» → «tenía», «medico» → «médico», «como» → «cómo», «inster» → «INSERT»,
+    espacio antes de coma y doble espacio eliminados.
+  - Redacción: tiempos verbales unificados en el párrafo de START TRANSACTION, persona
+    impersonal en todo el apartado y reescritos los párrafos de PBD-02b, PBD-03 y PBD-04a
+    (ahora citan `uq_cita_paciente_franja` y `trg_cita_bi`).
+  - Títulos de las pruebas con el mismo formato «PBD-xx: texto» (PBD-01 y PBD-02 iban al final).
+  - PBD-04b completado: el `INSERT` con `@rec` (variable que no existía) pasa a ser
+    `UPDATE cita SET id_trabajador = @enf WHERE id_cita = @cita;`. El texto explica que
+    `trg_cita_bu` lo rechaza con el error 1644 (SQLSTATE 45000).
+
+---
+
 ## 26/11/2026 · Kanban y Gantt día a día actualizados
 
 ### Cambios

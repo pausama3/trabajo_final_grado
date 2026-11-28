@@ -33,7 +33,7 @@ import java.io.IOException
 class BuscadorActivity : AppCompatActivity() {
 
     private companion object {
-        const val MIN_CARACTERES = 2              // evita listar a todos los pacientes con 1 letra
+        const val MIN_CARACTERES = MIN_CARACTERES_BUSQUEDA   // definido en Utilidades.kt
         const val CLAVE_RESULTADOS = "resultados" // para no perder la lista al girar la pantalla
     }
 
@@ -103,7 +103,7 @@ class BuscadorActivity : AppCompatActivity() {
 
     private fun buscar() {
         val texto = etBuscar.text.toString().trim()
-        if (texto.length < MIN_CARACTERES) {
+        if (!busquedaValida(texto)) {
             etBuscar.error = getString(R.string.buscar_minimo, MIN_CARACTERES)
             return
         }

@@ -21,6 +21,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 
 import com.medmanager.comun.PacienteDTO;
+import com.medmanager.escritorio.Validaciones;
 
 /**
  * Formulario de alta / modificación de los datos personales de un paciente.
@@ -119,15 +120,22 @@ public class DialogoPaciente extends JDialog {
             aviso("DNI, nombre y apellidos son obligatorios.");
             return;
         }
+        if (!Validaciones.esDniONie(txtDni.getText())) {
+            aviso("El DNI debe tener 8 números y una letra (o el NIE: X, Y o Z, 7 números y una letra).");
+            return;
+        }
+        // El email es opcional, pero si se escribe debe tener formato de correo
+        if (!txtEmail.getText().isBlank() && !Validaciones.esEmail(txtEmail.getText())) {
+            aviso("El email no tiene un formato válido.");
+            return;
+        }
         // La fecha de nacimiento es opcional, pero si se escribe debe ser válida
-        LocalDate fechaNac = null;
-        if (!txtFechaNac.getText().isBlank()) {
-            try {
-                fechaNac = LocalDate.parse(txtFechaNac.getText().trim(), FECHA);
-            } catch (DateTimeParseException ex) {
-                aviso("La fecha de nacimiento debe tener el formato dd/mm/aaaa.");
-                return;
-            }
+        LocalDate fechaNac;
+        try {
+            fechaNac = Validaciones.leerFecha(txtFechaNac.getText());
+        } catch (DateTimeParseException ex) {
+            aviso("La fecha de nacimiento debe tener el formato dd/mm/aaaa y ser una fecha que exista.");
+            return;
         }
         // El DNI se normaliza en mayúsculas; las alergias van a null porque recepción no las gestiona
         resultado = new PacienteDTO(idPaciente,
